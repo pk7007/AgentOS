@@ -1,0 +1,91 @@
+"""`agentos` command-line entry point.
+
+Each command group lives in a `cmd_*.py` module exposing `register(subparsers, common)`.
+Handlers have the signature `func(args, ctx) -> data | (data, exit_code)`.
+"""
+
+import argparse
+import importlib
+import json
+import os
+import sys
+from dataclasses import dataclass
+
+from agentos import __version__
+from agentos.errors import AgentOSError, PolicyDenied
+
+COMMAND_MODULES: tuple[str, ...] = ()
+
+
+@dataclass
+class Context:
+    actor: str
+    json: bool
+
+
+def build_parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(
+        prog="agentos", description="Local ledger and policy engine for multi-agent coding hosts."
+    )
+    parser.add_argument("--version", action="version", version=f"agentos {__version__}")
+    common = argparse.ArgumentParser(add_help=False)
+    common.add_argument("--json", action="store_true", help="machine-readable output")
+    common.add_argument("--actor", default=None, help="who is acting (default: $AGENTOS_ACTOR or 'host')")
+    sub = parser.add_subparsers(dest="command", metavar="COMMAND")
+    for name in COMMAND_MODULES:
+        importlib.import_module(f"agentos.cli.{name}").register(sub, common)
+    return parser
+
+
+def _render(data) -> str:
+    if data is None:
+        return ""
+    if isinstance(data, str):
+        return data
+    if isinstance(data, dict):
+        lines = []
+        for k, v in data.items():
+            if isinstance(v, (dict, list)):
+                v = json.dumps(v, default=str)
+            lines.append(f"{k}: {v}")
+        return "\n".join(lines)
+    if isinstance(data, list):
+        if not data:
+            return "(none)"
+        return "\n".join(
+            "  ".join(f"{k}={v}" for k, v in item.items()) if isinstance(item, dict) else str(item)
+            for item in data
+        )
+    return str(data)
+
+
+def main(argv: list[str] | None = None) -> int:
+    parser = build_parser()
+    try:
+        args = parser.parse_args(argv)
+    except SystemExit as exc:
+        return exc.code if isinstance(exc.code, int) else 2
+    if not getattr(args, "func", None):
+        parser.print_help(sys.stderr)
+        return 2
+    ctx = Context(actor=args.actor or os.environ.get("AGENTOS_ACTOR") or "host", json=args.json)
+    try:
+        result = args.func(args, ctx)
+    except AgentOSError as exc:
+        if ctx.json:
+            body = {"error": exc.message, "exit_code": exc.exit_code}
+            if isinstance(exc, PolicyDenied):
+                body["reasons"] = exc.reasons
+            print(json.dumps(body), file=sys.stderr)
+        else:
+            print(f"error: {exc.message}", file=sys.stderr)
+            if isinstance(exc, PolicyDenied) and exc.reasons:
+                print("reasons: " + ", ".join(exc.reasons), file=sys.stderr)
+        return exc.exit_code
+    code = 0
+    if isinstance(result, tuple):
+        result, code = result
+    out = json.dumps(result, indent=2, default=str) if ctx.json else _render(result)
+    if out:
+        print(out)
+    return code
