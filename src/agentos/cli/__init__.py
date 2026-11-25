@@ -14,7 +14,7 @@ from dataclasses import dataclass
 from agentos import __version__
 from agentos.errors import AgentOSError, PolicyDenied
 
-COMMAND_MODULES: tuple[str, ...] = ("cmd_system",)
+COMMAND_MODULES: tuple[str, ...] = ("cmd_system", "cmd_audit")
 
 
 @dataclass

@@ -5,7 +5,7 @@ import sqlite3
 import sys
 from pathlib import Path
 
-from agentos import db, paths
+from agentos import audit, db, paths
 from agentos.errors import IntegrityError
 
 
@@ -37,7 +37,8 @@ def cmd_init(args, ctx):
 
 
 def _after_init(conn, ctx) -> None:
-    """Hook for later modules (audit event on init)."""
+    with db.write_tx(conn):
+        audit.append_event(conn, "system.init", ctx.actor, {"schema_version": db.current_version(conn)})
 
 
 def _check(name, status, detail=""):
@@ -74,8 +75,9 @@ def doctor_checks() -> tuple[list[dict], bool]:
 
 
 def _extra_checks(conn) -> list[dict]:
-    """Hook for later modules (audit chain check)."""
-    return []
+    chain = audit.verify_chain(conn)
+    detail = f"{chain.checked} events" if chain.ok else f"broken at event seq {chain.first_bad_seq}"
+    return [_check("audit_chain", "VERIFIED" if chain.ok else "UNSUPPORTED", detail)]
 
 
 def cmd_doctor(args, ctx):
