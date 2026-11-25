@@ -49,7 +49,9 @@ def set_limit(conn: sqlite3.Connection, field: str, value: float, actor: str, ow
     _check_field(field)
     current = getattr(_local(conn), field)
     value = type(current)(value)
-    if value > current and owner is None:
+    from agentos.governance import is_owner
+
+    if value > current and not is_owner(owner):
         raise PolicyDenied(f"raising {field} from {current} to {value} needs the owner", reasons=["owner_required"])
     with write_tx(conn):
         put_setting(conn, f"limits.{field}", value)
@@ -69,7 +71,9 @@ def set_host_limit(conn: sqlite3.Connection, host: str, field: str, value: float
 
 def set_budget(conn: sqlite3.Connection, scope: Scope, scope_id: str, kind: BudgetKind, limit: float,
                actor: str, owner: object | None = None) -> None:
-    if kind == "usd" and limit > get_limits(conn).max_paid_spend_usd and owner is None:
+    from agentos.governance import is_owner
+
+    if kind == "usd" and limit > get_limits(conn).max_paid_spend_usd and not is_owner(owner):
         raise PolicyDenied("a paid-spend budget above the cap needs the owner", reasons=["owner_required"])
     with write_tx(conn):
         conn.execute(

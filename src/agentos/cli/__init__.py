@@ -14,12 +14,14 @@ from dataclasses import dataclass
 from agentos import __version__
 from agentos.errors import AgentOSError, PolicyDenied
 
-COMMAND_MODULES: tuple[str, ...] = ("cmd_system", "cmd_audit", "cmd_project", "cmd_task", "cmd_template", "cmd_agent", "cmd_budget")
+COMMAND_MODULES: tuple[str, ...] = ("cmd_system", "cmd_audit", "cmd_project", "cmd_task", "cmd_template", "cmd_agent", "cmd_budget", "cmd_governance")
 
 
 def owner_guard(action: str, ctx):
-    """Return an owner confirmation for `action`, or None when none is available (replaced in Task 9)."""
-    return None
+    """Ask the human owner at a real terminal to confirm `action`. Raises PolicyDenied otherwise."""
+    from agentos import governance
+
+    return governance.confirm_owner(action)
 
 
 def add_project_arg(parser) -> None:

@@ -81,3 +81,21 @@ def instance(seeded, project, task):
         (iid, project.id, task.id, ts, ts),
     )
     return iid
+
+
+@pytest.fixture
+def owner():
+    """A real OwnerConfirmation, built the only way one can be: through confirm_owner."""
+    from agentos import governance
+
+    return governance.confirm_owner("test action", isatty=lambda: True,
+                                    prompt=lambda msg: "I APPROVE test action")
+
+
+@pytest.fixture
+def owner_tty(monkeypatch):
+    """Simulate the owner at a real terminal typing the right phrase for whatever is asked."""
+    from agentos import governance
+
+    monkeypatch.setattr(governance, "_default_isatty", lambda: True)
+    monkeypatch.setattr(governance, "_default_prompt", lambda msg: "I APPROVE " + msg.split("'")[1])

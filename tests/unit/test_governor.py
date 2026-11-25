@@ -15,11 +15,13 @@ def test_lower_limit_ok(conn):
     assert governor.get_limits(conn).max_concurrent == 2
 
 
-def test_raise_limit_needs_owner(conn):
+def test_raise_limit_needs_owner(conn, owner):
     with pytest.raises(PolicyDenied) as e:
         governor.set_limit(conn, "max_concurrent", 8, actor="t")
     assert "owner_required" in e.value.reasons
-    governor.set_limit(conn, "max_concurrent", 8, actor="t", owner=object())
+    with pytest.raises(PolicyDenied):
+        governor.set_limit(conn, "max_concurrent", 8, actor="t", owner=object())
+    governor.set_limit(conn, "max_concurrent", 8, actor="t", owner=owner)
     assert governor.get_limits(conn).max_concurrent == 8
 
 

@@ -103,7 +103,9 @@ def set_status(conn: sqlite3.Connection, template_id: str, to: TemplateStatus, a
     if key not in _ALLOWED:
         raise PolicyDenied(f"cannot move template from {current.status.value} to {to.value}",
                            reasons=["illegal_transition"])
-    if _ALLOWED[key] and owner is None:
+    from agentos.governance import is_owner
+
+    if _ALLOWED[key] and not is_owner(owner):
         raise PolicyDenied(f"moving a template to {to.value} needs the owner", reasons=["owner_required"])
     with write_tx(conn):
         conn.execute("UPDATE agent_templates SET status=? WHERE id=?", (to.value, template_id))

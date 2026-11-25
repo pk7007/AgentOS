@@ -39,7 +39,13 @@ def _get(home, key):
     return v
 
 
-def test_backup_then_restore_roundtrip(cli, home):
+def test_restore_without_owner_denied(cli, home):
+    cli(["init"])
+    _, out, _ = cli(["backup", "--json"])
+    assert cli(["restore", json.loads(out)["path"]])[0] == 3
+
+
+def test_backup_then_restore_roundtrip(cli, home, owner_tty):
     cli(["init"])
     _set(home, "x", '"before"')
     code, out, _ = cli(["backup", "--json"])
@@ -51,7 +57,7 @@ def test_backup_then_restore_roundtrip(cli, home):
     assert _get(home, "x") == '"before"'
 
 
-def test_restore_rejects_non_sqlite(cli, home, tmp_path):
+def test_restore_rejects_non_sqlite(cli, home, tmp_path, owner_tty):
     cli(["init"])
     bad = tmp_path / "bad.db"
     bad.write_bytes(b"not a db at all" * 100)
@@ -61,7 +67,7 @@ def test_restore_rejects_non_sqlite(cli, home, tmp_path):
     assert _sha(home / "state" / "agentos.db") == before
 
 
-def test_restore_rejects_newer_schema(cli, home, tmp_path):
+def test_restore_rejects_newer_schema(cli, home, tmp_path, owner_tty):
     cli(["init"])
     code, out, _ = cli(["backup", "--json"])
     newer = json.loads(out)["path"]
