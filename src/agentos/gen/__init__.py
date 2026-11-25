@@ -50,7 +50,7 @@ class Writer:
 
     def finish(self) -> GenResult:
         self.out.mkdir(parents=True, exist_ok=True)
-        (self.out / MANIFEST).write_text(json.dumps(self.new, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+        (self.out / MANIFEST).write_bytes((json.dumps(self.new, indent=2, sort_keys=True) + "\n").encode("utf-8"))
         return self.result
 
 

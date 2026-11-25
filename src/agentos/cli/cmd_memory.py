@@ -32,7 +32,8 @@ def register(sub, common) -> None:
     q.add_argument("--no-org", action="store_true")
     q.add_argument("--limit", type=int, default=10)
     q.set_defaults(func=cmd_search)
-    i = s.add_parser("inspect", parents=[common], help="show one record")
+    i = s.add_parser("inspect", parents=[common], help="show one record of this project (or a shared one)")
+    add_project_arg(i)
     i.add_argument("id")
     i.set_defaults(func=cmd_inspect)
     c = s.add_parser("correct", parents=[common], help="replace a record with a new version")
@@ -84,7 +85,7 @@ def cmd_search(args, ctx):
 def cmd_inspect(args, ctx):
     conn = db.require_initialized()
     try:
-        return memory.inspect(conn, args.id).model_dump(mode="json")
+        return memory.read(conn, args.id, _project(conn, args).id).model_dump(mode="json")
     finally:
         conn.close()
 

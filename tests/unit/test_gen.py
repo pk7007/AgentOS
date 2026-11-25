@@ -100,6 +100,16 @@ def test_host_profile_malformed_is_usage_error(tmp_path):
         host.load_profile(profile)
 
 
+def test_committed_codex_plugin_is_up_to_date(tmp_path):
+    """plugins/codex is generated output that ships in the repo; it must match the definitions."""
+    result = codex.generate(DEFS, tmp_path)
+    committed = ROOT / "plugins" / "codex"
+    stale = [p.relative_to(tmp_path).as_posix() for p in result.written
+             if not (committed / p.relative_to(tmp_path)).exists()
+             or (committed / p.relative_to(tmp_path)).read_bytes().replace(b"\r\n", b"\n") != p.read_bytes()]
+    assert stale == [], "run: agentos gen codex --force"
+
+
 def test_no_vendor_names_in_package():
     pattern = re.compile("|".join(VENDOR_WORDS), re.IGNORECASE)
     offenders = [str(p) for p in (ROOT / "src").rglob("*") if p.is_file() and p.suffix in {".py", ".sql", ".md", ".toml"}

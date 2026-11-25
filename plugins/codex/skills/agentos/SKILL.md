@@ -41,8 +41,10 @@ If `status` reports an emergency stop, do not start agents. Tell the user.
    `agentos agent transition <instance> RUNNING` ... `REVIEWING` ... `COMPLETED` or `FAILED`
    (add `--reason`). Leaving the active states frees its slot. `agentos task start|done|fail <task>`.
 6. **Grade with evidence.** A different agent, never the worker itself, its parent or its child:
-   `agentos eval record <instance> --evaluator <id> --category coding --score correctness=90 --score tests=80 --evidence "pytest -q: 41 passed"`
-   No evidence, no grade. Use `--flag security_violation` only for real violations.
+   `agentos eval record <instance> --evaluator <id> --category coding --score quality=90 --score accuracy=85 --evidence "pytest -q: 41 passed"`
+   Score keys (0-100): quality, accuracy, reliability, instruction_compliance, security_compliance,
+   cost_efficiency, speed, collaboration. No evidence, no grade. Use `--flag security_violation`
+   only for real violations.
 7. **Save what was learned.**
    `agentos memory add project "decision and why" --source <file or PR>`
    `agentos memory search "<words>" --json` before re-solving something.

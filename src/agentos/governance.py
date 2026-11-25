@@ -148,19 +148,26 @@ def request_approval(conn: sqlite3.Connection, action: str, params: dict, reques
 
 def grant(conn: sqlite3.Connection, approval_id: str, owner, actor: str) -> Approval:
     require_owner(owner, "granting an approval")
-    a = get_approval(conn, approval_id)
-    if a.status != "pending":
-        raise PolicyDenied(f"approval is {a.status}", reasons=["approval_not_pending"])
     with write_tx(conn):
+        a = _pending(conn, approval_id)
         conn.execute("UPDATE approvals SET status='granted', granted_at=? WHERE id=?", (util.now_iso(), approval_id))
         audit.append_event(conn, "approval.granted", actor, {"approval_id": approval_id, "action": a.action})
     return get_approval(conn, approval_id)
 
 
+def _pending(conn: sqlite3.Connection, approval_id: str) -> Approval:
+    """Read inside the caller's write transaction, so the status can't change before the update."""
+    a = get_approval(conn, approval_id)
+    if a.status != "pending":
+        raise PolicyDenied(f"approval is {a.status}", reasons=["approval_not_pending"])
+    return a
+
+
 def deny(conn: sqlite3.Connection, approval_id: str, actor: str) -> Approval:
-    get_approval(conn, approval_id)
+    """Only a pending approval can be denied; otherwise nothing changes and nothing is audited."""
     with write_tx(conn):
-        conn.execute("UPDATE approvals SET status='denied' WHERE id=? AND status='pending'", (approval_id,))
+        _pending(conn, approval_id)
+        conn.execute("UPDATE approvals SET status='denied' WHERE id=?", (approval_id,))
         audit.append_event(conn, "approval.denied", actor, {"approval_id": approval_id})
     return get_approval(conn, approval_id)
 

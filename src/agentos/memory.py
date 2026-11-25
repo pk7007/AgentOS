@@ -66,6 +66,14 @@ def inspect(conn: sqlite3.Connection, record_id: str) -> MemoryRecord:
     return _row(row)
 
 
+def read(conn: sqlite3.Connection, record_id: str, project_id: str) -> MemoryRecord:
+    """Inspect for callers: the record must belong to `project_id` or be shared (org scope)."""
+    rec = inspect(conn, record_id)
+    if rec.project_id != project_id and rec.scope != "org":
+        raise PolicyDenied("memory record belongs to another project", reasons=["cross_project"])
+    return rec
+
+
 def _insert(conn, *, project_id, scope, layer, content, source, author, confidence, validated, tags,
             version=1, supersedes=None) -> str:
     rid = new_id("mem")

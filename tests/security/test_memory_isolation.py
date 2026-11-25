@@ -40,3 +40,11 @@ def test_correct_and_delete_cannot_cross_projects(conn, project, other):
         memory.correct(conn, r.id, "edited", author="t", project_id=other.id)
     with pytest.raises(PolicyDenied):
         memory.delete(conn, r.id, actor="t", project_id=other.id)
+
+
+def test_read_cannot_cross_projects(conn, project, other):
+    r = memory.add(conn, project.id, Layer.semantic, "secret plan", source="s", author="t")
+    with pytest.raises(PolicyDenied) as e:
+        memory.read(conn, r.id, other.id)
+    assert "cross_project" in e.value.reasons
+    assert memory.read(conn, r.id, project.id).content == "secret plan"
