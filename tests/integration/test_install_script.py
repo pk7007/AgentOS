@@ -51,6 +51,10 @@ def test_install_then_uninstall(tmp_path):
     checks = {c["name"]: c["status"] for c in report["checks"]}
     assert checks["database"] == "VERIFIED" and checks["audit_chain"] == "VERIFIED"
     assert (home / "state" / "agentos.db").exists()
+    t = subprocess.run(["cmd", "/c", str(shim), "template", "list", "--json"], capture_output=True, text=True,
+                       timeout=120, env=env, check=False)
+    assert t.returncode == 0, t.stderr
+    assert {x["id"] for x in json.loads(t.stdout)} >= {"lead", "implementer", "reviewer", "researcher"}
 
     u = _ps("uninstall.ps1", "-Apply", "-AgentosHome", str(home), "-NoPath", env=env)
     assert u.returncode == 0, u.stdout + u.stderr

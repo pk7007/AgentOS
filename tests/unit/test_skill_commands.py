@@ -52,6 +52,8 @@ def test_skill_command_parses(cmd):
     try:
         args = build_parser().parse_args(argv)
     except SystemExit as exc:
+        if argv == ["--version"] and exc.code == 0:
+            return
         pytest.fail(f"skill command does not parse: {cmd!r} -> {argv} (exit {exc.code})")
     assert getattr(args, "func", None), f"incomplete command in skill: {cmd!r}"
 

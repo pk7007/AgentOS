@@ -84,11 +84,13 @@ if ($NoPath) {
     }
 }
 
-Step "agentos init and agentos doctor"
+Step "agentos init, template seed and doctor"
 if ($Apply) {
     $env:AGENTOS_HOME = $AgentosHome
     & $Shim init
     Check "agentos init"
+    & $Shim template seed
+    Check "agentos template seed"
     & $Shim doctor
     Check "agentos doctor"
 }

@@ -16,7 +16,8 @@ Always pass `--json` when you read its output. Exit codes: 0 ok, 2 usage or not 
 ## Before you start
 
 ```
-agentos status --json            # initialized? emergency stop? limits?
+agentos status --json            # initialized? emergency stop? active work?
+agentos limits show --json       # concurrency, depth and budget limits
 agentos project activate .       # once per repository
 ```
 
