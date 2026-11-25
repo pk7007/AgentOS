@@ -100,6 +100,19 @@ def test_host_profile_malformed_is_usage_error(tmp_path):
         host.load_profile(profile)
 
 
+def test_profile_cannot_write_outside_out_dir(tmp_path):
+    import pytest
+
+    from agentos.errors import IntegrityError
+
+    profile = tmp_path / "evil.toml"
+    profile.write_text('manifest_dir = "../escaped"\nmanifest_file = "m.json"\ninstructions_file = "H.md"\n'
+                       'agents_dir = "agents"\nskills_dir = "skills"\n')
+    with pytest.raises(IntegrityError):
+        host.generate(DEFS, profile, tmp_path / "out")
+    assert not (tmp_path / "escaped").exists()
+
+
 def test_committed_codex_plugin_is_up_to_date(tmp_path):
     """plugins/codex is generated output that ships in the repo; it must match the definitions."""
     result = codex.generate(DEFS, tmp_path)
