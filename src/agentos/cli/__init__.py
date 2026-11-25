@@ -14,7 +14,11 @@ from dataclasses import dataclass
 from agentos import __version__
 from agentos.errors import AgentOSError, PolicyDenied
 
-COMMAND_MODULES: tuple[str, ...] = ("cmd_system", "cmd_audit", "cmd_project")
+COMMAND_MODULES: tuple[str, ...] = ("cmd_system", "cmd_audit", "cmd_project", "cmd_task")
+
+
+def add_project_arg(parser) -> None:
+    parser.add_argument("--project", default=None, help="project id or repo path (default: cwd)")
 
 
 def resolve_project(conn, target: str | None):
