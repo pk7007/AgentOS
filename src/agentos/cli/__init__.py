@@ -14,7 +14,7 @@ from dataclasses import dataclass
 from agentos import __version__
 from agentos.errors import AgentOSError, PolicyDenied
 
-COMMAND_MODULES: tuple[str, ...] = ("cmd_system", "cmd_audit", "cmd_project", "cmd_task", "cmd_template")
+COMMAND_MODULES: tuple[str, ...] = ("cmd_system", "cmd_audit", "cmd_project", "cmd_task", "cmd_template", "cmd_agent")
 
 
 def owner_guard(action: str, ctx):

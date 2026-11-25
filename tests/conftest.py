@@ -49,3 +49,35 @@ def project(conn, repo):
     from agentos import projects
 
     return projects.activate(conn, repo, actor="test")
+
+
+DEFINITIONS = __import__("pathlib").Path(__file__).resolve().parents[1] / "definitions" / "agents"
+
+
+@pytest.fixture
+def seeded(conn):
+    from agentos import templates
+
+    templates.seed(conn, DEFINITIONS, actor="test")
+    return conn
+
+
+@pytest.fixture
+def task(conn, project):
+    from agentos import tasks
+
+    return tasks.add_task(conn, project.id, "fixture task", actor="test")
+
+
+@pytest.fixture
+def instance(seeded, project, task):
+    """An agent instance inserted directly in RUNNING state (bypasses admission)."""
+    from agentos.util import new_id, now_iso
+
+    iid, ts = new_id("ag"), now_iso()
+    seeded.execute(
+        "INSERT INTO agent_instances(id, template_id, template_version, project_id, task_id, parent_id, depth,"
+        " host, state, created_at, updated_at) VALUES (?, 'implementer', 1, ?, ?, NULL, 0, 'test', 'RUNNING', ?, ?)",
+        (iid, project.id, task.id, ts, ts),
+    )
+    return iid
