@@ -8,7 +8,7 @@ from typing import Literal
 from pydantic import BaseModel
 
 from agentos import audit
-from agentos.db import get_setting, write_tx
+from agentos.db import write_tx
 from agentos.errors import NotFound, PolicyDenied
 from agentos.projects import require_active
 from agentos.util import new_id, now_iso
@@ -98,7 +98,9 @@ def add_task(
         depth = parent.depth + 1
         if depth > MAX_TASK_DEPTH:
             raise PolicyDenied(f"task depth {depth} exceeds {MAX_TASK_DEPTH}", reasons=["max_task_depth"])
-    max_retries = int(get_setting(conn, "limits.max_retries", 2))
+    from agentos.governor import get_limits
+
+    max_retries = get_limits(conn).max_retries
     tid, ts = new_id("task"), now_iso()
     with write_tx(conn):
         conn.execute(

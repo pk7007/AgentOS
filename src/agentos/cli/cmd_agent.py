@@ -27,7 +27,32 @@ def register(sub, common) -> None:
 
 
 def _register_admit(s, common) -> None:
-    """Admission is added by the admission task."""
+    from agentos.cli import add_project_arg
+
+    a = s.add_parser("admit", parents=[common],
+                     help="ask permission before spawning a worker (exit 3 = denied: do not spawn)")
+    add_project_arg(a)
+    a.add_argument("--task", required=True)
+    a.add_argument("--template", required=True)
+    a.add_argument("--parent", default=None, help="instance id of the delegating agent")
+    a.add_argument("--host", default="other", help="codex, cc or other")
+    a.set_defaults(func=cmd_admit)
+
+
+def cmd_admit(args, ctx):
+    from agentos import admission
+    from agentos.cli import resolve_project
+
+    conn = db.require_initialized()
+    try:
+        p = resolve_project(conn, args.project)
+        d = admission.admit(conn, admission.AdmitRequest(project_id=p.id, task_id=args.task,
+                                                         template_id=args.template,
+                                                         parent_instance_id=args.parent, host=args.host),
+                            ctx.actor)
+        return d.model_dump(), (0 if d.allowed else 3)
+    finally:
+        conn.close()
 
 
 def _view(inst):
