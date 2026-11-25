@@ -14,7 +14,12 @@ from dataclasses import dataclass
 from agentos import __version__
 from agentos.errors import AgentOSError, PolicyDenied
 
-COMMAND_MODULES: tuple[str, ...] = ("cmd_system", "cmd_audit", "cmd_project", "cmd_task")
+COMMAND_MODULES: tuple[str, ...] = ("cmd_system", "cmd_audit", "cmd_project", "cmd_task", "cmd_template")
+
+
+def owner_guard(action: str, ctx):
+    """Return an owner confirmation for `action`, or None when none is available (replaced in Task 9)."""
+    return None
 
 
 def add_project_arg(parser) -> None:

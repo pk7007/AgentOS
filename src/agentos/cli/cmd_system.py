@@ -113,12 +113,9 @@ def cmd_backup(args, ctx):
     return {"path": str(path)}
 
 
-def owner_guard(action: str, ctx) -> object | None:
-    """Replaced in the governance task with a real owner confirmation."""
-    return None
-
-
 def cmd_restore(args, ctx):
+    from agentos.cli import owner_guard
+
     db.require_initialized().close()
     db.validate_backup(args.file)
     owner_guard(f"restore {args.file.name}", ctx)
