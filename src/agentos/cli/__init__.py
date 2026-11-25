@@ -14,7 +14,18 @@ from dataclasses import dataclass
 from agentos import __version__
 from agentos.errors import AgentOSError, PolicyDenied
 
-COMMAND_MODULES: tuple[str, ...] = ("cmd_system", "cmd_audit")
+COMMAND_MODULES: tuple[str, ...] = ("cmd_system", "cmd_audit", "cmd_project")
+
+
+def resolve_project(conn, target: str | None):
+    """Resolve --project / positional target: a project id, a path, or the current directory."""
+    from pathlib import Path
+
+    from agentos import projects
+
+    if target and target.startswith("prj_"):
+        return projects.get_project(conn, target)
+    return projects.get_project(conn, projects.project_id_for(Path(target) if target else Path.cwd()))
 
 
 @dataclass
