@@ -1,0 +1,28 @@
+# Copy what you want into your own config by hand. agentos never edits it for you.
+[agents]
+max_threads = 4
+max_depth = 2
+
+[agents.implementer]
+description = "Writes and changes code test-first."
+config_file = "agents/implementer.toml"
+
+[agents.lead]
+description = "Plans the work, admits workers through agentos, integrates results."
+config_file = "agents/lead.toml"
+
+[agents.planner]
+description = "Breaks objectives into a dependency graph of small tasks."
+config_file = "agents/planner.toml"
+
+[agents.recovery]
+description = "Diagnoses failures and restores a known-good state."
+config_file = "agents/recovery.toml"
+
+[agents.researcher]
+description = "Read-only investigation of code, docs and options."
+config_file = "agents/researcher.toml"
+
+[agents.reviewer]
+description = "Independent read-only review for correctness, security and missing tests."
+config_file = "agents/reviewer.toml"

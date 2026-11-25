@@ -29,6 +29,6 @@ def test_limits_show_and_raise_denied(cli, home):
 def test_budget_set_and_show(cli, home):
     cli(["init"])
     assert cli(["budget", "set", "global", "tokens_est", "1000"])[0] == 0
-    code, out, _ = cli(["budget", "show", "--json"])
+    _code, out, _ = cli(["budget", "show", "--json"])
     assert json.loads(out)[0]["limit"] == 1000
     assert cli(["budget", "set", "global", "usd", "5"])[0] == 3

@@ -16,7 +16,7 @@ def test_task_flow_via_cli(cli, home, repo):
 
 def test_task_add_in_unactivated_repo_denied(cli, home, repo):
     cli(["init"])
-    code, _, err = cli(["task", "add", "x", "--project", str(repo)])
+    code, _, _err = cli(["task", "add", "x", "--project", str(repo)])
     assert code == 4
 
 

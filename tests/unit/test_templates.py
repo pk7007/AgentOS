@@ -11,8 +11,8 @@ ROOT = Path(__file__).resolve().parents[2]
 
 
 def _tpl(**kw):
-    base = dict(id="coder", version=1, name="Coder", role="implementer", department="engineering",
-                description="writes code", capabilities=["python"], instructions="Write code.")
+    base = {"id": "coder", "version": 1, "name": "Coder", "role": "implementer", "department": "engineering",
+                "description": "writes code", "capabilities": ["python"], "instructions": "Write code."}
     base.update(kw)
     return AgentTemplate(**base)
 

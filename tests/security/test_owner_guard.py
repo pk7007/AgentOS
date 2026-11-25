@@ -8,7 +8,7 @@ RUN = "import sys; from agentos.cli import main; sys.exit(main(sys.argv[1:]))"
 def _agentos(home, *args):
     env = dict(os.environ, AGENTOS_HOME=str(home))
     return subprocess.run([sys.executable, "-c", RUN, *args], env=env, stdin=subprocess.DEVNULL,
-                          capture_output=True, text=True, timeout=120)
+                          capture_output=True, text=True, timeout=120, check=False)
 
 
 def test_cli_retire_without_tty_denied(home):
@@ -34,5 +34,5 @@ def test_no_env_var_bypass(home):
     _agentos(home, "stop", "--reason", "drill")
     env_args = dict(os.environ, AGENTOS_HOME=str(home), AGENTOS_OWNER_CONFIRM="1")
     r = subprocess.run([sys.executable, "-c", RUN, "stop", "--lift"], env=env_args, stdin=subprocess.DEVNULL,
-                       capture_output=True, text=True, timeout=120)
+                       capture_output=True, text=True, timeout=120, check=False)
     assert r.returncode == 3

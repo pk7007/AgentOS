@@ -13,10 +13,9 @@ def test_migrate_idempotent(home):
 def test_write_tx_rolls_back(conn):
     from agentos import db
 
-    with pytest.raises(RuntimeError):
-        with db.write_tx(conn):
-            conn.execute("INSERT INTO settings VALUES ('k','1')")
-            raise RuntimeError
+    with pytest.raises(RuntimeError), db.write_tx(conn):
+        conn.execute("INSERT INTO settings VALUES ('k','1')")
+        raise RuntimeError
     assert conn.execute("SELECT count(*) FROM settings WHERE key='k'").fetchone()[0] == 0
 
 

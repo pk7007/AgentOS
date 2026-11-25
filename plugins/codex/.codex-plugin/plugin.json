@@ -1,0 +1,23 @@
+{
+  "name": "agentos",
+  "version": "0.1.0",
+  "description": "Local ledger and referee for multi-agent coding: admission limits, lifecycle, evaluations, memory, handovers and a tamper-evident audit log.",
+  "license": "MIT",
+  "keywords": [
+    "agents",
+    "orchestration",
+    "governance",
+    "audit"
+  ],
+  "skills": "./skills/",
+  "interface": {
+    "displayName": "AgentOS",
+    "shortDescription": "Local ledger and referee for multi-agent coding: admission limits, lifecycle, evaluations, memory, handovers and a tamper-evident audit log.",
+    "category": "Coding",
+    "capabilities": [
+      "Interactive",
+      "Read",
+      "Write"
+    ]
+  }
+}

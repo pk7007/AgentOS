@@ -45,7 +45,7 @@ class ResumeReport(BaseModel):
 
 def _git(repo: Path, *args) -> tuple[int, str]:
     try:
-        out = subprocess.run(["git", "-C", str(repo), *args], capture_output=True, text=True, timeout=60)
+        out = subprocess.run(["git", "-C", str(repo), *args], capture_output=True, text=True, timeout=60, check=False)
         return out.returncode, out.stdout.strip()
     except (OSError, subprocess.TimeoutExpired):
         return 1, ""

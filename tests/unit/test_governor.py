@@ -38,9 +38,8 @@ def test_host_limit_tightens(conn):
 
 
 def test_paid_spend_blocked(conn):
-    with pytest.raises(PolicyDenied) as e:
-        with db.write_tx(conn):
-            governor.reserve(conn, [("global", "*")], "usd", 0.01, holder="x")
+    with pytest.raises(PolicyDenied) as e, db.write_tx(conn):
+        governor.reserve(conn, [("global", "*")], "usd", 0.01, holder="x")
     assert "paid_spend_blocked" in e.value.reasons
 
 
@@ -55,9 +54,8 @@ def test_budget_exceeded_and_release(conn):
     chain = [("global", "*"), ("project", "p1")]
     with db.write_tx(conn):
         rid = governor.reserve(conn, chain, "tokens_est", 80, holder="a")
-    with pytest.raises(PolicyDenied) as e:
-        with db.write_tx(conn):
-            governor.reserve(conn, chain, "tokens_est", 30, holder="b")
+    with pytest.raises(PolicyDenied) as e, db.write_tx(conn):
+        governor.reserve(conn, chain, "tokens_est", 30, holder="b")
     assert "budget_exceeded:project:tokens_est" in e.value.reasons
     with db.write_tx(conn):
         governor.release(conn, rid, actual=40)

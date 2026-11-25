@@ -4,7 +4,7 @@ import os
 import sqlite3
 import sys
 from dataclasses import dataclass, field
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 from pydantic import BaseModel
 
@@ -134,7 +134,7 @@ def request_approval(conn: sqlite3.Connection, action: str, params: dict, reques
     import json
 
     aid, now = util.new_id("apr"), util.now_iso()
-    expires = (datetime.now(timezone.utc) + timedelta(minutes=ttl_minutes)).replace(microsecond=0)
+    expires = (datetime.now(UTC) + timedelta(minutes=ttl_minutes)).replace(microsecond=0)
     expires_iso = expires.isoformat().replace("+00:00", "Z")
     with write_tx(conn):
         conn.execute(

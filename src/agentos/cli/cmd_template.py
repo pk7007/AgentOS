@@ -1,10 +1,13 @@
 """template add | seed | list | inspect | suspend | quarantine | retire | reinstate."""
 
-import tomllib
 from pathlib import Path
 
+from pydantic import ValidationError
+
 from agentos import db, templates
+from agentos.errors import UsageError
 from agentos.templates import AgentTemplate, TemplateStatus
+from agentos.util import load_toml
 
 
 def default_definitions_dir() -> Path:
@@ -38,8 +41,10 @@ def register(sub, common) -> None:
 def cmd_add(args, ctx):
     conn = db.require_initialized()
     try:
-        with args.file.open("rb") as fh:
-            t = AgentTemplate(**tomllib.load(fh))
+        try:
+            t = AgentTemplate(**load_toml(args.file))
+        except ValidationError as exc:
+            raise UsageError(f"invalid template {args.file}: {exc.errors()[0]['msg']}") from exc
         return templates.add_template(conn, t, ctx.actor).model_dump(mode="json")
     finally:
         conn.close()

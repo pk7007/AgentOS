@@ -2,8 +2,8 @@ from agentos.complexity import ComplexityInput, score
 
 
 def _inp(**kw):
-    base = dict(task_count=1, dependency_depth=0, workstreams=1, files_touched=1,
-                domain_difficulty=1, uncertainty=0, risk=0, verification_effort=1)
+    base = {"task_count": 1, "dependency_depth": 0, "workstreams": 1, "files_touched": 1,
+                "domain_difficulty": 1, "uncertainty": 0, "risk": 0, "verification_effort": 1}
     base.update(kw)
     return ComplexityInput(**base)
 

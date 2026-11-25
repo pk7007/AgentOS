@@ -39,8 +39,8 @@ def register(sub, common) -> None:
     i = s.add_parser("inspect", parents=[common], help="show one task")
     i.add_argument("task")
     i.set_defaults(func=cmd_inspect)
-    for verb in _MOVES:
-        m = s.add_parser(verb, parents=[common], help=f"move a task ({_MOVES[verb].value})")
+    for verb, state in _MOVES.items():
+        m = s.add_parser(verb, parents=[common], help=f"move a task ({state.value})")
         m.add_argument("task")
         m.add_argument("--note", default=None)
         m.set_defaults(func=cmd_move, verb=verb)

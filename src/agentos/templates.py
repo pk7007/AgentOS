@@ -2,7 +2,6 @@
 
 import json
 import sqlite3
-import tomllib
 from enum import Enum
 from pathlib import Path
 from typing import Literal
@@ -12,7 +11,7 @@ from pydantic import BaseModel, Field
 from agentos import audit
 from agentos.db import write_tx
 from agentos.errors import NotFound, PolicyDenied
-from agentos.util import now_iso
+from agentos.util import load_toml, now_iso
 
 
 class TemplateStatus(str, Enum):
@@ -118,8 +117,7 @@ def set_status(conn: sqlite3.Connection, template_id: str, to: TemplateStatus, a
 def load_definitions(directory: Path) -> list[AgentTemplate]:
     out = []
     for path in sorted(Path(directory).glob("*.toml")):
-        with path.open("rb") as fh:
-            out.append(AgentTemplate(**tomllib.load(fh)))
+        out.append(AgentTemplate(**load_toml(path)))
     return out
 
 

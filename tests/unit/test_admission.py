@@ -83,7 +83,7 @@ def test_agent_run_budget(seeded, project):
     ts = _tasks(seeded, project, 2)
     assert _admit(seeded, project, ts[0].id).allowed
     d = _admit(seeded, project, ts[1].id)
-    assert f"budget_exceeded:project:agent_runs" in d.reasons
+    assert "budget_exceeded:project:agent_runs" in d.reasons
 
 
 def test_denial_is_audited(seeded, project):
