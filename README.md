@@ -27,7 +27,7 @@ AgentOS never calls a model, never uses the network, and spends nothing.
 Needs Python 3.11 or newer and Git.
 
 ```powershell
-git clone REPO_URL AgentOS
+git clone https://github.com/pk7007/AgentOS.git
 cd AgentOS
 powershell -ExecutionPolicy Bypass -File scripts\install.ps1            # dry run: shows what it would do
 powershell -ExecutionPolicy Bypass -File scripts\install.ps1 -Apply     # install
