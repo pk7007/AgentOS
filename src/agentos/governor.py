@@ -22,6 +22,7 @@ class Limits(BaseModel):
     max_agents_per_task: int = 12
     max_paid_spend_usd: float = 0.0
     max_remediation_rounds: int = 5
+    max_factory_templates: int = 5
 
 
 FIELDS = tuple(Limits.model_fields)

@@ -54,6 +54,16 @@ ledger, not agents, and the schedule is advice: a host can admit tasks in anothe
 admission stays the gate. Decomposition quality is the host's; AgentOS checks only that the
 plan is well formed.
 
+## The Agent Factory drafts by rule
+
+`agentos factory` builds a specialist configuration from the closest existing template and fixed
+wording; it does not write instructions with a model. The host can supply better instructions with
+`--file`. Validation proves a configuration is safe to register (safety rules present, no
+rule-loosening phrases from a fixed list, no matched secrets, no wider access without the owner),
+not that it is good at the work: only the evaluations that follow show that. The workforce
+thresholds (3 failures in a row, probation at 3 and 6 evaluations, 72-hour expiry, 5 live
+specialists) are hand-picked and uncalibrated.
+
 ## Termination may be unconfirmed
 
 AgentOS cannot stop a host's native worker process. Moving an instance to CANCELLED or

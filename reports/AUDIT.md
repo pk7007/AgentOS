@@ -17,9 +17,9 @@ Criterion register over the source spec's audit domains A to AO, for version 0.1
 which criterion Z forbids. The spec's 9/10 target is therefore **not claimed** for this slice.
 A row is VERIFIED only when a test or recorded command shows it.
 
-Evidence paths are relative to `tests/`. Test run at time of writing (after V4.0 Phase 3,
-Boss loop): `python -m pytest -q` gives **467 passed** (the live test is excluded by
-default). Branch coverage is 94% overall: boss 91%, runtime 93%, hook CLI 100%, admission 96%, audit 97%, evidence 95%, governance 97%, governor 96%, lifecycle 97%, performance 95%, redact 100%. After Phase 2 it was 425 passed, after Phase 1 381. `ruff check src tests` is clean. A fresh clone of the pre-fix commit `1b7d492` gave
+Evidence paths are relative to `tests/`. Test run at time of writing (after V4.0 Phase 4,
+workforce): `python -m pytest -q` gives **537 passed** (the live test is excluded by
+default). Branch coverage is 95% overall: factory 93%, workforce 97%, boss 92%, runtime 93%, hook CLI 100%, admission 96%, audit 97%, evidence 95%, governance 97%, governor 96%, lifecycle 97%, performance 95%, redact 100%. After Phase 3 it was 467 passed, after Phase 2 425, after Phase 1 381. `ruff check src tests` is clean. A fresh clone of the pre-fix commit `1b7d492` gave
 303 passed and a clean ruff run, which is the Phase 0 baseline.
 
 ### Host role
@@ -34,7 +34,7 @@ about what AgentOS *records and enforces*, not about decision quality, which sli
 
 | Criterion | Status | Evidence | Notes |
 | --- | --- | --- | --- |
-| Modularity | VERIFIED | one module per concern under `src/agentos/`; each has its own unit test file | 21 core modules, a 4-file generator package, 15 CLI command modules |
+| Modularity | VERIFIED | one module per concern under `src/agentos/`; each has its own unit test file | 23 core modules, a 4-file generator package, 17 CLI command modules |
 | Extensibility | PARTIAL | `cli/__init__.py` `COMMAND_MODULES`; `gen/host.py` profiles (`unit/test_gen.py::test_host_generate_uses_profile`) | adding a command or host needs no core change; no plugin API for third parties |
 | Separation of concerns | VERIFIED | CLI handlers call core functions only; core never imports `cli` | the owner prompt lives in `governance` |
 | Dependency boundaries | VERIFIED | `pyproject.toml`: one runtime dependency (pydantic) | stdlib for SQLite, TOML, argparse |
@@ -60,7 +60,7 @@ about what AgentOS *records and enforces*, not about decision quality, which sli
 | --- | --- | --- | --- |
 | Clear authority | VERIFIED | owner vs host split: `unit/test_governance.py::test_cannot_forge_confirmation`, `security/test_owner_guard.py::test_no_env_var_bypass` | |
 | Role separation | VERIFIED | read-only reviewer and researcher templates; no self-grading: `unit/test_performance.py::test_self_eval_rejected`, `::test_parent_and_child_eval_rejected` | |
-| Dynamic departments | VERIFIED | `unit/test_boss.py::test_departments_only_when_the_work_justifies_one`, `::test_large_objectives_may_get_a_department_lead`, `::test_no_executive_worker_for_routine_work` | departments are ledger records; a lead worker is only suggested |
+| Dynamic departments | VERIFIED | dissolution: `unit/test_workforce.py::test_contract_archives_dissolves_and_expires`, `::test_dissolved_department_can_form_again`; creation: `unit/test_boss.py::test_departments_only_when_the_work_justifies_one`, `::test_large_objectives_may_get_a_department_lead`, `::test_no_executive_worker_for_routine_work` | departments are ledger records; a lead worker is only suggested |
 | Managerial effectiveness | NOT BUILT | none | not measurable in slice 1 |
 | Organizational adaptability | LATER (slice 3) | none | needs benchmarks |
 
@@ -70,9 +70,9 @@ about what AgentOS *records and enforces*, not about decision quality, which sli
 | --- | --- | --- | --- |
 | Capability detection | VERIFIED | `unit/test_recruit.py::test_gap_reported`; `integration/test_cli_flows.py::test_eval_perf_and_recruit` | reports missing capabilities, never invents a template |
 | Candidate selection | VERIFIED | `unit/test_recruit.py::test_rank_prefers_match`, `::test_rank_prefers_history_on_equal_match`, `::test_high_risk_requires_proven` | weights uncalibrated |
-| Onboarding | PARTIAL | `template add` / `seed`: `unit/test_templates.py::test_seed_definitions_load`, `integration/test_cli_template_file.py` | no probation step |
-| Validation | PARTIAL | schema validation of templates (`unit/test_templates.py::test_bad_slug_rejected`) | no behavioural validation of a new template |
-| Recruitment efficiency | NOT BUILT | none | not measured |
+| Onboarding | VERIFIED | `template add` / `seed`: `unit/test_templates.py::test_seed_definitions_load`; factory registration: `unit/test_factory.py::test_register_adds_an_active_template`; a new template has no record, so high-risk work refuses it | probation exists for rehabilitated templates, not for brand-new ones |
+| Validation | PARTIAL | schema plus safety validation of factory configs: `unit/test_factory.py::test_unsafe_configurations_are_refused`, `::test_safety_rules_are_always_appended`, `::test_wider_permissions_wait_for_the_owner` | no behavioural test of a new template before use |
+| Recruitment efficiency | PARTIAL | `factory recruit` reuses a covering template and reuses an open proposal: `unit/test_factory.py::test_recruit_uses_an_existing_template_when_one_fits`, `::test_recruit_waits_for_the_owner_on_a_pending_proposal` | not measured |
 
 ## E: Elastic workforce scaling
 
@@ -80,20 +80,20 @@ about what AgentOS *records and enforces*, not about decision quality, which sli
 | --- | --- | --- | --- |
 | Recursive delegation | VERIFIED | `unit/test_admission.py::test_depth_and_delegation` | depth capped by `max_depth` (default 2) |
 | Concurrency | VERIFIED | `concurrency/test_parallel_admission.py::test_parallel_processes_never_exceed_limit` | 12 processes race; exactly 4 admitted |
-| Workload adaptation | PARTIAL | complexity band suggests agent count (`unit/test_complexity.py::test_parallelism_caps_agents`) | advisory only |
+| Workload adaptation | VERIFIED | `workforce split` by effort and free slots: `unit/test_workforce.py::test_split_by_workload`, `::test_split_respects_free_slots`, `::test_split_refuses_more_workers_than_work` | each part still needs admission |
 | Overhead management | PARTIAL | `max_agents_per_task`: `unit/test_admission.py::test_max_agents_per_task` | |
-| Workforce contraction | VERIFIED | slots free on leaving active states: `unit/test_admission.py::test_release_on_completion` | |
+| Workforce contraction | VERIFIED | slots free on leaving active states: `unit/test_admission.py::test_release_on_completion`; `workforce contract`: `unit/test_workforce.py::test_contract_archives_dissolves_and_expires` | running workers are reported, not stopped |
 
 ## F: Firing and replacement
 
 | Criterion | Status | Evidence | Notes |
 | --- | --- | --- | --- |
 | Performance diagnosis | VERIFIED | `unit/test_performance.py::test_bands_and_retain`, `::test_critical_visible_despite_high_mean`, `::test_external_cause_excluded` | |
-| Rehabilitation | PARTIAL | `retrain` recommendation and RETRAINING state exist (`unit/test_lifecycle.py`) | no retraining procedure |
-| Suspension | VERIFIED | `unit/test_templates.py::test_suspend_and_reinstate_without_owner`, `integration/test_cli_flows.py::test_template_status_verbs` | |
-| Safe cancellation | PARTIAL | CANCELLED then TERMINATED, recorded as unconfirmed: `unit/test_lifecycle.py::test_terminate_unconfirmed_is_recorded` | AgentOS cannot stop a host's native worker; see LIMITATIONS |
-| Replacement | PARTIAL | `retire_review` needs 5 or more evaluations from 2 or more failing evaluators: `unit/test_performance.py::test_retire_review_needs_two_evaluators`; retire needs the owner | no automatic replacement |
-| Knowledge preservation | PARTIAL | memory and handovers survive retirement (`unit/test_memory.py`, `unit/test_handover.py`) | no exit-interview capture |
+| Rehabilitation | VERIFIED | new version on probation: `unit/test_workforce.py::test_rehabilitation_passes_on_probation`, `::test_failed_rehabilitation_suspends`, `::test_rehabilitation_cannot_widen_permissions` | the improvement itself is written by the host |
+| Suspension | VERIFIED | `unit/test_templates.py::test_suspend_and_reinstate_without_owner`; performance-based: `unit/test_workforce.py::test_review_suspends_after_failing_in_a_row`, `::test_review_suspends_on_retire_review_but_leaves_retirement_to_the_owner` | |
+| Safe cancellation | PARTIAL | CANCELLED then TERMINATED, recorded as unconfirmed: `unit/test_lifecycle.py::test_terminate_unconfirmed_is_recorded`; `workforce terminate`: `unit/test_workforce.py::test_terminate_active_worker_keeps_its_slot_until_the_stop_is_confirmed` | AgentOS cannot stop a host's native worker; see LIMITATIONS |
+| Replacement | VERIFIED | `workforce transfer` picks the best other covering template and checks admission before stopping the old worker: `unit/test_workforce.py::test_transfer_picks_a_replacement_and_briefs_it`, `::test_refused_transfer_leaves_the_old_worker_running`; retire needs the owner | the host must stop the old native worker |
+| Knowledge preservation | VERIFIED | termination and transfer notes go to project memory, failures to the failure layer: `unit/test_workforce.py::test_terminate_failed_worker_records_a_failure_lesson`; evaluations and evidence carried in the transfer briefing | the note is what the host writes |
 
 ## G: Governance
 
@@ -112,7 +112,7 @@ about what AgentOS *records and enforces*, not about decision quality, which sli
 | Failure detection | PARTIAL | FAILED state, retry limit: `unit/test_tasks.py::test_retry_limit`; orphan warnings on resume: `unit/test_handover.py::test_orphaned_instances_warning` | no heartbeat |
 | Recovery | PARTIAL | `boss recover` retries with a template that has not failed the task: `unit/test_boss.py::test_recover_retries_with_another_template` | the host must start the retry |
 | Checkpointing | VERIFIED | handovers: `unit/test_handover.py::test_create_and_resume_cross_host` | |
-| Reassignment | PARTIAL | FAILED to ASSIGNED transition (`unit/test_lifecycle.py::test_all_legal_transitions_allowed`) | manual |
+| Reassignment | VERIFIED | `workforce transfer`: `unit/test_workforce.py::test_transfer_picks_a_replacement_and_briefs_it`, `::test_transfer_to_a_named_template`, `integration/test_cli_workforce.py::test_split_then_terminate_and_transfer` | |
 | Fault isolation | VERIFIED | security flag quarantines: `unit/test_performance.py::test_security_flag_quarantines` | |
 
 ## I: Intelligence
@@ -201,7 +201,7 @@ about what AgentOS *records and enforces*, not about decision quality, which sli
 | --- | --- | --- | --- |
 | Acceptance criteria | PARTIAL | `task add --accept` is stored | not checked automatically |
 | Independent evaluation | VERIFIED | `unit/test_performance.py::test_self_eval_rejected`, `::test_parent_and_child_eval_rejected` | |
-| Testing | VERIFIED | 467 tests across unit, integration, security and concurrency | |
+| Testing | VERIFIED | 537 tests across unit, integration, security and concurrency | |
 | Regression prevention | VERIFIED | `unit/test_gen.py::test_committed_codex_plugin_is_up_to_date`, `unit/test_skill_commands.py`; CI in `.github/workflows/ci.yml` (lint and tests, Windows and Ubuntu, Python 3.11 and 3.12) | first run (45842647948) failed on Ubuntu only: a test assumed case-insensitive paths; fixed in `b8a2a74`, then run 45843512290 passed on all four jobs. The Codex discovery test skips on CI, which has no Codex CLI |
 | Evidence integrity | VERIFIED | evidence required, audit chain tamper-evident (see O) | |
 | Live host follows the skill | **BLOCKED** | `live/test_codex_smoke.py::test_codex_follows_skill` (written, **not run**) | uses the owner's Codex quota; runs only with `pytest -m live` after the owner's go-ahead |
@@ -234,7 +234,7 @@ about what AgentOS *records and enforces*, not about decision quality, which sli
 | Performance history | VERIFIED | `unit/test_performance.py::test_bands_and_retain` | |
 | Promotion | LATER (slice 3) | none | |
 | Reassignment | PARTIAL | see H | |
-| Succession planning | NOT BUILT | none | |
+| Succession planning | VERIFIED | `unit/test_workforce.py::test_succession_finds_successors_and_single_points_of_failure` | |
 
 ## U: Usage optimization
 
@@ -535,3 +535,31 @@ Built as ledger checks the host calls (`agentos boss`), not as a new model-calli
 | Nine executive functions | VERIFIED (as checks) | `::test_review_covers_every_executive_function` | checks, not workers, by design |
 | No executive workers for routine work | VERIFIED | `::test_no_executive_worker_for_routine_work`, `integration/test_cli_boss.py::test_boss_loop_end_to_end` | |
 | CLI end to end | VERIFIED | `integration/test_cli_boss.py::test_boss_loop_end_to_end` (start, plan, next, admit, evidence, grade, accept, deliver, show, `audit verify`) | not run in a live host session |
+
+## V4.0 Phase 4: Agent Factory and workforce management
+
+See [docs/WORKFORCE.md](../docs/WORKFORCE.md). Everything runs on the ledger and through
+admission; nothing starts or kills a native worker.
+
+| Requirement | Status | Evidence | Open |
+| --- | --- | --- | --- |
+| Gap to specialist: propose, validate, register, recruit | VERIFIED | `unit/test_factory.py::test_gap_becomes_a_safe_proposal`, `::test_register_adds_an_active_template`, `::test_recruit_builds_and_admits_a_specialist_for_a_gap`, `integration/test_cli_workforce.py::test_factory_fills_a_gap_and_recruits` | drafts are rule-based; quality shows only in later evaluations |
+| Within approved permissions | VERIFIED | `::test_wider_permissions_wait_for_the_owner`, `::test_draft_inherits_from_the_closest_template`, `integration/test_cli_workforce.py::test_wider_specialist_needs_the_owner` | |
+| Within approved budgets and limits | VERIFIED | `::test_factory_limit_caps_live_specialists`, `::test_recruit_still_goes_through_admission` | |
+| Unsafe configurations refused | VERIFIED | `::test_unsafe_configurations_are_refused`, `::test_safety_rules_are_always_appended`, `::test_unknown_override_fields_are_refused` | phrase list is fixed, not semantic |
+| Performance-based candidate selection | VERIFIED | `unit/test_recruit.py::test_rank_prefers_history_on_equal_match`; used by `factory recruit` and `workforce transfer` | weights uncalibrated |
+| Dynamic recruitment | VERIFIED | `unit/test_factory.py::test_recruit_uses_an_existing_template_when_one_fits`, `::test_recruit_builds_and_admits_a_specialist_for_a_gap` | |
+| Temporary specialist configurations | VERIFIED | `::test_temporary_specialists_expire_unless_busy`, `::test_busy_specialist_is_kept_past_expiry`, `::test_permanent_specialists_never_expire` | |
+| Department creation and dissolution | VERIFIED | `unit/test_boss.py::test_departments_only_when_the_work_justifies_one`, `unit/test_workforce.py::test_contract_archives_dissolves_and_expires`, `::test_dissolved_department_can_form_again` | |
+| Workload-based subagent multiplication | VERIFIED | `unit/test_workforce.py::test_split_by_workload`, `::test_split_respects_free_slots`, `::test_split_refuses_more_workers_than_work` | |
+| Recursive delegation | VERIFIED | `unit/test_admission.py::test_depth_and_delegation` (unchanged); factory specialists cannot delegate without the owner | |
+| Workforce contraction | VERIFIED | `unit/test_workforce.py::test_contract_archives_dissolves_and_expires` | running workers are reported, not stopped |
+| Succession planning | VERIFIED | `::test_succession_finds_successors_and_single_points_of_failure` | |
+| Agent rehabilitation | VERIFIED | `::test_rehabilitation_passes_on_probation`, `::test_failed_rehabilitation_suspends`, `::test_rehabilitation_reinstates_a_suspended_template_on_probation`, `::test_rehabilitation_cannot_widen_permissions` | |
+| Performance-based suspension | VERIFIED | `::test_review_suspends_after_failing_in_a_row`, `::test_review_suspends_on_retire_review_but_leaves_retirement_to_the_owner`, `::test_review_leaves_good_templates_alone` | |
+| Safe termination | VERIFIED (ledger) | `::test_terminate_active_worker_keeps_its_slot_until_the_stop_is_confirmed`, `::test_terminate_finished_worker_is_confirmed` | the native stop is the host's |
+| Automatic replacement | VERIFIED | `::test_transfer_picks_a_replacement_and_briefs_it`, `::test_transfer_without_a_replacement_points_to_the_factory` | |
+| Transfer of unfinished assignments | VERIFIED | `::test_transfer_to_a_named_template`, `::test_refused_transfer_leaves_the_old_worker_running`, `integration/test_cli_workforce.py::test_split_then_terminate_and_transfer` | |
+| Knowledge and audit preserved | VERIFIED | `::test_terminate_failed_worker_records_a_failure_lesson`; suspension, not deletion, on expiry; `audit verify` in `integration/test_cli_workforce.py::test_factory_fills_a_gap_and_recruits` | |
+| Owner approval where governance requires it | VERIFIED | factory widening needs `factory_register`; retiring and quarantine release stay owner-only: `::test_rehabilitation_input_checks` | |
+| Native platform constraints respected | VERIFIED (by design) | no code path starts or stops a native worker; admission and the runtime hooks stay the gate | not run in a live host session |

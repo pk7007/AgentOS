@@ -298,6 +298,23 @@ the objective only with a passing evidence record for every criterion. The execu
 are checks, not workers; a department lead is suggested only for large objectives. Details:
 [docs/BOSS.md](docs/BOSS.md).
 
+### Agent Factory and workforce
+
+When no template covers a task, `factory recruit` drafts a specialist from the closest existing
+template, validates it (safety rules always appended; rule-loosening text, secrets and oversized
+configs refused), registers it and admits it. A specialist that asks for more than its base
+template (write access, new tools, delegation, elevated security) waits for the owner's approval.
+Specialists are temporary by default and expire after 72 hours unless busy; at most
+`max_factory_templates` are live at once.
+
+`workforce` keeps the team matched to the work and its record: `review` suspends templates that
+keep failing, `rehab` and `probation` bring a weak one back with a better version, `succession`
+names who could take over each template's work, `split` spreads a heavy task across parallel
+parts, `contract` archives finished workers and dissolves empty departments, `terminate` stops a
+worker safely and saves what it learned, and `transfer` hands unfinished work to a replacement
+with a briefing. Retiring a template stays with the owner. Details:
+[docs/WORKFORCE.md](docs/WORKFORCE.md).
+
 ### Emergency stop
 
 `agentos stop` is a big red button anyone can press: no new workers are admitted, and running
@@ -316,6 +333,8 @@ not initialized, `3` refused by policy, `4` not found, `5` integrity failure.
 | Projects | `project activate [PATH]`, `project deactivate [PATH or ID]`, `project list` |
 | Tasks | `task add TITLE`, `task dep TASK --on OTHER`, `task list`, `task ready`, `task inspect`, `task start / done / fail / block / cancel / retry / unblock TASK` |
 | Planning | `plan score --tasks --depth --workstreams --files --difficulty --uncertainty --risk --verify` |
+| Agent Factory | `factory recruit --task --host [--parent] [--permanent]`, `factory propose --cap CAP [--task] [--file SPEC.toml] [--permanent] [--ttl-hours]`, `factory register / show ID`, `factory reject ID --reason`, `factory expire`, `factory list [--status]` |
+| Workforce | `workforce review`, `workforce rehab TEMPLATE --file V2.toml`, `workforce probation TEMPLATE`, `workforce succession`, `workforce split TASK [--parts N]`, `workforce contract`, `workforce terminate ID --reason [--note]`, `workforce transfer ID --host [--to TEMPLATE] [--note]`, `workforce transfers` |
 | Objectives (Boss) | `boss start TITLE --accept CRITERION [--statement] [8 complexity flags]`, `boss plan OBJ --file PLAN.json`, `boss next / bottlenecks / review / show OBJ`, `boss accept TASK --eval EV_ID [--min-score]`, `boss recover TASK`, `boss deliver OBJ --criterion N=EVD_ID`, `boss list` |
 | Templates | `template add FILE`, `template seed`, `template list`, `template inspect ID`, `template suspend / quarantine / retire / reinstate ID --reason` |
 | Agents | `agent admit --task --template [--parent] [--host]`, `agent transition ID STATE [--confirmed]`, `agent confirm-stop ID`, `agent list [--active]`, `agent inspect ID` |
@@ -341,6 +360,7 @@ refuse (exit 3, `cross_project`) when it belongs to a different project than the
 | `max_agents_per_task` | 12 | agent runs per task |
 | `max_paid_spend_usd` | 0.0 | cap on any `usd` budget |
 | `max_remediation_rounds` | 5 | fix-and-review rounds |
+| `max_factory_templates` | 5 | factory specialists registered and active at once |
 
 Anyone may **lower** a limit; **raising** one needs the owner. A host can record its own
 stricter limit with `limits host`, and the strictest value wins.

@@ -32,7 +32,7 @@ If `status` reports an emergency stop, do not start agents. Tell the user.
    `agentos task add "title" --objective "..." --cap testing --accept "tests pass" --risk medium --json`
    `agentos task dep <task> --on <other>`; `agentos task ready --json` lists what can start.
 3. **Pick a template.** `agentos recruit --cap <capability> --json` ranks templates by fit and
-   track record. If nothing fits, tell the user; do not invent one.
+   track record. If nothing fits, use the factory (`factory recruit`, below); do not invent a template.
 4. **Ask before every spawn.**
    `agentos agent admit --task <task> --template <id> [--parent <your instance>] --host <host> --json`
    Exit 0 gives you an instance id. Exit 3 means **do not start the worker**: read `reasons`
@@ -80,11 +80,11 @@ the quality gate; you still decide everything.
    ]}
    ```
    It is all or nothing: a cycle, unknown dependency or bad field creates no tasks. `capability_gaps`
-   lists capabilities no active template covers; tell the user instead of inventing a template.
+   lists capabilities no active template covers; staff those tasks with `factory recruit`.
 3. **Schedule.** `agentos boss next <objective> --json` lists ready tasks, critical path first,
    with the free slots, the best template and whether admission would pass. `dispatch` means
    go (still `agent admit` first), `queued_capacity` means wait, `blocked_by_policy` gives the
-   reasons, `capability_gap` means no template fits. `executive_workers` suggests a department
+   reasons, `capability_gap` means no template fits (use the factory). `executive_workers` suggests a department
    lead only for large objectives; for routine work it is empty, so don't spawn one.
 4. **Watch for trouble.** `agentos boss bottlenecks <objective> --json` (blocked or failed
    tasks, critical blockers, idle or orphaned workers, full capacity, low budget) and
@@ -98,6 +98,39 @@ the quality gate; you still decide everything.
 7. **Deliver.** `agentos boss deliver <objective> --criterion 0=<evd id> --json`, giving one
    `evd_` proof per acceptance criterion (numbered from 0). It refuses while any task is open or
    unaccepted. `agentos boss show <objective> --json` prints the delivery report.
+
+## Staffing gaps and managing the workforce
+
+When no template covers a task, let the Agent Factory build one instead of inventing it yourself:
+
+- `agentos factory recruit --task <task> --host <host> --json` uses the best existing template if one
+  covers the task; otherwise it drafts a specialist from the closest template, validates it,
+  registers it and admits it. `status` is `admitted` (spawn with the instance id),
+  `awaiting_owner` (the specialist asks for more than its base template, such as write access,
+  new tools or delegation; ask the user to run the `approval grant` command it names) or `denied`
+  (read `reasons`). Specialists are temporary by default and expire after 72 hours unless busy.
+- To shape the specialist yourself: `agentos factory propose --cap <capability> --file spec.toml --json`
+  (fields: `instructions`, `description`, `tools_allow`, `tools_deny`, `read_only`, ...), then
+  `agentos factory register <proposal> --json`. The safety rules are always appended; text that
+  loosens them, or contains a secret, is refused.
+
+Keep the workforce matched to the work:
+
+- `agentos workforce review --json` suspends templates that keep failing (and flags weak ones
+  for rehabilitation). Retiring stays with the owner.
+- `agentos workforce rehab <template> --file v2.toml --json` registers an improved version on
+  probation; `agentos workforce probation <template> --json` judges it after three evaluations.
+  A rehabilitation may not widen permissions.
+- `agentos workforce succession --json` shows who could take over each template's work.
+- `agentos workforce split <task> --json` splits a task with `effort` of 2 or more into parallel
+  parts, one worker each; the parent becomes the integration step.
+- `agentos workforce terminate <instance> --reason "..." --note "what the next worker should know" --json`
+  stops a worker safely (stop it in your runtime too) and saves the note to memory.
+- `agentos workforce transfer <instance> --host <host> [--to <template>] --note "..." --json` hands
+  unfinished work to a replacement, chosen on performance unless you name one. Give the new worker
+  the returned `briefing`.
+- `agentos workforce contract --json` archives finished workers, expires temporary specialists and
+  dissolves departments with nothing open.
 
 ## Handing over
 

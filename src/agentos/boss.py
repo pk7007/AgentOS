@@ -131,6 +131,25 @@ def departments(conn: sqlite3.Connection, objective_id: str) -> list[str]:
         (objective_id,))]
 
 
+def dissolve_departments(conn: sqlite3.Connection, objective_id: str, actor: str) -> list[str]:
+    """Dissolve every department of the objective that has no open task left. The record stays."""
+    obj = get_objective(conn, objective_id)
+    closed = tuple(s.value for s in CLOSED)
+    out = []
+    with write_tx(conn):
+        for fn in departments(conn, obj.id):
+            open_n = conn.execute(f"SELECT count(*) FROM tasks WHERE objective_id=? AND department=?"
+                                  f" AND state NOT IN ({','.join('?' * len(closed))})",
+                                  (obj.id, fn, *closed)).fetchone()[0]
+            if open_n == 0:
+                conn.execute("UPDATE departments SET dissolved_at=? WHERE objective_id=? AND function=?",
+                             (now_iso(), obj.id, fn))
+                audit.append_event(conn, "boss.department_dissolved", actor,
+                                   {"objective_id": obj.id, "function": fn}, obj.project_id)
+                out.append(fn)
+    return out
+
+
 def function_for(capabilities: list[str], explicit: str | None = None) -> str:
     if explicit:
         return explicit
@@ -224,7 +243,8 @@ def _form_departments(conn, obj: Objective, actor: str) -> None:
     for fn, n in conn.execute("SELECT department, count(*) FROM tasks WHERE objective_id=? GROUP BY department",
                               (obj.id,)):
         if fn and n >= need and fn not in have:
-            conn.execute("INSERT INTO departments(id, objective_id, function, created_at) VALUES (?,?,?,?)",
+            conn.execute("INSERT INTO departments(id, objective_id, function, created_at) VALUES (?,?,?,?)"
+                         " ON CONFLICT(objective_id, function) DO UPDATE SET dissolved_at=NULL",
                          (new_id("dep"), obj.id, fn, now_iso()))
             audit.append_event(conn, "boss.department_created", actor,
                                {"objective_id": obj.id, "function": fn, "tasks": n}, obj.project_id)
@@ -602,6 +622,7 @@ def deliver(conn: sqlite3.Connection, objective_id: str, criteria_evidence: dict
             audit.append_event(conn, "boss.delivered", actor,
                                {"objective_id": obj.id, "tasks": len(rows), "criteria": len(criteria)},
                                obj.project_id)
+            dissolve_departments(conn, obj.id, actor)
     if denied:
         raise denied
     return {"objective": get_objective(conn, obj.id).model_dump(), **report}
