@@ -7,8 +7,15 @@ from agentos.errors import NotFound, PolicyDenied
 from tests.conftest import make_repo
 
 
+@pytest.mark.skipif(__import__("os").name != "nt", reason="Windows paths are case-insensitive")
 def test_same_repo_different_spelling_same_id(repo):
     assert projects.project_id_for(repo) == projects.project_id_for(Path(str(repo).upper() + "\\"))
+
+
+def test_trailing_separator_same_id(repo):
+    import os
+
+    assert projects.project_id_for(repo) == projects.project_id_for(Path(str(repo) + os.sep))
 
 
 def test_subdir_maps_to_repo_root(repo):
