@@ -286,6 +286,18 @@ You `approval grant` it at your terminal. The approval is bound to that exact ac
 exact parameters, expires (default 60 minutes) and can be used once (`approval consume`).
 `approval check` exits 0 only while a valid approval exists.
 
+### Objectives (the Boss loop)
+
+For work bigger than one task, the host runs an objective: `boss start` records it with testable
+acceptance criteria, `boss plan` applies the host's decomposition (JSON) in one transaction,
+`boss next` says what to start by critical path and free slots, `boss bottlenecks` and
+`boss review` (nine executive checks: operations, engineering, hr, finance, intelligence,
+security, data, risk, quality) show what is stuck, `boss recover` handles a failed task,
+`boss accept` takes a done task only on an independent passing grade, and `boss deliver` closes
+the objective only with a passing evidence record for every criterion. The executive functions
+are checks, not workers; a department lead is suggested only for large objectives. Details:
+[docs/BOSS.md](docs/BOSS.md).
+
 ### Emergency stop
 
 `agentos stop` is a big red button anyone can press: no new workers are admitted, and running
@@ -304,6 +316,7 @@ not initialized, `3` refused by policy, `4` not found, `5` integrity failure.
 | Projects | `project activate [PATH]`, `project deactivate [PATH or ID]`, `project list` |
 | Tasks | `task add TITLE`, `task dep TASK --on OTHER`, `task list`, `task ready`, `task inspect`, `task start / done / fail / block / cancel / retry / unblock TASK` |
 | Planning | `plan score --tasks --depth --workstreams --files --difficulty --uncertainty --risk --verify` |
+| Objectives (Boss) | `boss start TITLE --accept CRITERION [--statement] [8 complexity flags]`, `boss plan OBJ --file PLAN.json`, `boss next / bottlenecks / review / show OBJ`, `boss accept TASK --eval EV_ID [--min-score]`, `boss recover TASK`, `boss deliver OBJ --criterion N=EVD_ID`, `boss list` |
 | Templates | `template add FILE`, `template seed`, `template list`, `template inspect ID`, `template suspend / quarantine / retire / reinstate ID --reason` |
 | Agents | `agent admit --task --template [--parent] [--host]`, `agent transition ID STATE [--confirmed]`, `agent confirm-stop ID`, `agent list [--active]`, `agent inspect ID` |
 | Evidence | `evidence run [--timeout S] -- COMMAND...`, `evidence show ID` |

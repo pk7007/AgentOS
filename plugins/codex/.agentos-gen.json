@@ -2,12 +2,12 @@
   ".agents/plugins/marketplace.json": "2c1dfae8e2ccd10578c93d8fff53ef812983568fc330a123afbd735d945e51dd",
   ".codex-plugin/plugin.json": "2e8d89ebc95081cfa03a8dfcd749e833f96b89334f996ea7e212b4c8dd516fca",
   "agents/implementer.toml": "bd4630425692272700730b9483ca2f0669bcbe0894c8d63faf63fc447f6cceb1",
-  "agents/lead.toml": "6a3096aea8b8ed04f4584e6fc056cb2414bdd4872e9837114edd0845abef881d",
+  "agents/lead.toml": "413440f6a5509c2f794106d11b3dbbfe64da1aee9a3d0034a40dedb95aeea4ec",
   "agents/planner.toml": "1f523938c86406ebf6a5f084a0012f8bbead0814be108ae5d6564edb9e09dce2",
   "agents/recovery.toml": "1485f831fe24252e2e43d56872696efc58713810c655f9da2c611fc0d909674e",
   "agents/researcher.toml": "69b59b8f11092d5ceecaf181cc98d29764be998e2ae03f524aaae7a1054512c5",
   "agents/reviewer.toml": "de3cb84b076cd8622e5952792909c9d8c6bc6a95bb7920a03360744655785fb9",
   "config-snippet.toml": "50fb5aa95b8984e847bbe14e5c99afa2687da9a83c8b1a55da0b8b52463fc361",
   "hooks/hooks.json": "7a8c77afbafc7b65b257cce9242ad10fb8ba5834369333f4c39537273a89788d",
-  "skills/agentos/SKILL.md": "8b58d8e54b93fe1d4137cbf7e7fa2dd9ef7635a58677cf6c91a9fb9fcdacb5ad"
+  "skills/agentos/SKILL.md": "47d3cdbcf5d33f937b0891ec759223940f3d568dbdf9a7e24c71cbf80c6b8b58"
 }

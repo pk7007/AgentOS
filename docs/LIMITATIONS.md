@@ -45,6 +45,15 @@ The complexity score (`plan score`), the recruit ranking weights and the perform
 are simple hand-picked formulas. They have not been checked against outcomes. Benchmarks that
 would calibrate them are planned for slice 3. Treat their output as a starting point.
 
+## The Boss loop advises; admission decides
+
+`agentos boss` keeps the plan, schedule and quality gate for an objective. Its thresholds (3
+tasks per department, 60 minutes before a worker counts as stale, 80% budget warning, score 70
+to accept) are hand-picked and uncalibrated. The nine executive functions are checks over the
+ledger, not agents, and the schedule is advice: a host can admit tasks in another order, and
+admission stays the gate. Decomposition quality is the host's; AgentOS checks only that the
+plan is well formed.
+
 ## Termination may be unconfirmed
 
 AgentOS cannot stop a host's native worker process. Moving an instance to CANCELLED or

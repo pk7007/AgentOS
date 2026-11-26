@@ -17,9 +17,9 @@ Criterion register over the source spec's audit domains A to AO, for version 0.1
 which criterion Z forbids. The spec's 9/10 target is therefore **not claimed** for this slice.
 A row is VERIFIED only when a test or recorded command shows it.
 
-Evidence paths are relative to `tests/`. Test run at time of writing (after V4.0 Phase 2,
-runtime hooks): `python -m pytest -q` gives **425 passed** (the live test is excluded by
-default). Branch coverage is 95% overall: runtime 93%, hook CLI 100%, admission 96%, audit 97%, evidence 95%, governance 97%, governor 96%, lifecycle 97%, performance 95%, redact 100%. After Phase 1 it was 381 passed. `ruff check src tests` is clean. A fresh clone of the pre-fix commit `1b7d492` gave
+Evidence paths are relative to `tests/`. Test run at time of writing (after V4.0 Phase 3,
+Boss loop): `python -m pytest -q` gives **467 passed** (the live test is excluded by
+default). Branch coverage is 94% overall: boss 91%, runtime 93%, hook CLI 100%, admission 96%, audit 97%, evidence 95%, governance 97%, governor 96%, lifecycle 97%, performance 95%, redact 100%. After Phase 2 it was 425 passed, after Phase 1 381. `ruff check src tests` is clean. A fresh clone of the pre-fix commit `1b7d492` gave
 303 passed and a clean ruff run, which is the Phase 0 baseline.
 
 ### Host role
@@ -34,7 +34,7 @@ about what AgentOS *records and enforces*, not about decision quality, which sli
 
 | Criterion | Status | Evidence | Notes |
 | --- | --- | --- | --- |
-| Modularity | VERIFIED | one module per concern under `src/agentos/`; each has its own unit test file | 18 core modules, a 4-file generator package, 12 CLI command modules |
+| Modularity | VERIFIED | one module per concern under `src/agentos/`; each has its own unit test file | 21 core modules, a 4-file generator package, 15 CLI command modules |
 | Extensibility | PARTIAL | `cli/__init__.py` `COMMAND_MODULES`; `gen/host.py` profiles (`unit/test_gen.py::test_host_generate_uses_profile`) | adding a command or host needs no core change; no plugin API for third parties |
 | Separation of concerns | VERIFIED | CLI handlers call core functions only; core never imports `cli` | the owner prompt lives in `governance` |
 | Dependency boundaries | VERIFIED | `pyproject.toml`: one runtime dependency (pydantic) | stdlib for SQLite, TOML, argparse |
@@ -46,13 +46,13 @@ about what AgentOS *records and enforces*, not about decision quality, which sli
 
 | Criterion | Status | Evidence | Notes |
 | --- | --- | --- | --- |
-| Objective understanding | NOT BUILT | none | the host does this; AgentOS stores the objective on tasks and handovers |
-| Planning | PARTIAL | `plan score`: `unit/test_complexity.py`, `integration/test_cli_task.py::test_plan_score_cli` | a heuristic sizing aid, uncalibrated |
-| Decision-making | NOT BUILT | none | host's job |
+| Objective understanding | PARTIAL | objectives need testable acceptance criteria: `unit/test_boss.py::test_objective_needs_acceptance_criteria`; complexity recorded: `::test_objective_records_complexity` | the host understands the objective; AgentOS records it and refuses a vague one |
+| Planning | PARTIAL | `plan score`: `unit/test_complexity.py`; plans applied atomically with validation: `unit/test_boss.py::test_plan_is_all_or_nothing`, `::test_plan_validation`, `::test_plan_creates_linked_tasks_and_dependencies` | decomposition quality is the host's; heuristics uncalibrated |
+| Decision-making | PARTIAL | scheduling by critical path and capacity: `unit/test_boss.py::test_schedule_puts_the_critical_path_first`, `::test_schedule_respects_capacity` | advisory; the host decides and admission gates |
 | Delegation | VERIFIED | `unit/test_admission.py::test_depth_and_delegation`, `::test_parent_must_be_active` | only `can_delegate` templates may spawn children |
 | Coordination | PARTIAL | task dependencies and `task ready`: `unit/test_tasks.py::test_ready_orders_by_priority` | no messaging between agents |
 | Accountability | VERIFIED | every state change is audited: `unit/test_lifecycle.py::test_illegal_transition_audited`, `unit/test_admission.py::test_denial_is_audited` | |
-| Escalation | PARTIAL | owner-only actions refuse without the owner: `security/test_owner_guard.py` | no automatic escalation path |
+| Escalation | PARTIAL | owner-only actions refuse without the owner: `security/test_owner_guard.py`; `boss recover` escalates to the owner once retries are spent: `unit/test_boss.py::test_recover_escalates_when_retries_run_out` | the owner is told through the host, not notified directly |
 
 ## C: Corporate hierarchy
 
@@ -60,7 +60,7 @@ about what AgentOS *records and enforces*, not about decision quality, which sli
 | --- | --- | --- | --- |
 | Clear authority | VERIFIED | owner vs host split: `unit/test_governance.py::test_cannot_forge_confirmation`, `security/test_owner_guard.py::test_no_env_var_bypass` | |
 | Role separation | VERIFIED | read-only reviewer and researcher templates; no self-grading: `unit/test_performance.py::test_self_eval_rejected`, `::test_parent_and_child_eval_rejected` | |
-| Dynamic departments | NOT BUILT | templates carry a `department` field only | |
+| Dynamic departments | VERIFIED | `unit/test_boss.py::test_departments_only_when_the_work_justifies_one`, `::test_large_objectives_may_get_a_department_lead`, `::test_no_executive_worker_for_routine_work` | departments are ledger records; a lead worker is only suggested |
 | Managerial effectiveness | NOT BUILT | none | not measurable in slice 1 |
 | Organizational adaptability | LATER (slice 3) | none | needs benchmarks |
 
@@ -110,7 +110,7 @@ about what AgentOS *records and enforces*, not about decision quality, which sli
 | Criterion | Status | Evidence | Notes |
 | --- | --- | --- | --- |
 | Failure detection | PARTIAL | FAILED state, retry limit: `unit/test_tasks.py::test_retry_limit`; orphan warnings on resume: `unit/test_handover.py::test_orphaned_instances_warning` | no heartbeat |
-| Recovery | PARTIAL | `recovery` template; FAILED to ASSIGNED is allowed | no automatic recovery |
+| Recovery | PARTIAL | `boss recover` retries with a template that has not failed the task: `unit/test_boss.py::test_recover_retries_with_another_template` | the host must start the retry |
 | Checkpointing | VERIFIED | handovers: `unit/test_handover.py::test_create_and_resume_cross_host` | |
 | Reassignment | PARTIAL | FAILED to ASSIGNED transition (`unit/test_lifecycle.py::test_all_legal_transitions_allowed`) | manual |
 | Fault isolation | VERIFIED | security flag quarantines: `unit/test_performance.py::test_security_flag_quarantines` | |
@@ -201,7 +201,7 @@ about what AgentOS *records and enforces*, not about decision quality, which sli
 | --- | --- | --- | --- |
 | Acceptance criteria | PARTIAL | `task add --accept` is stored | not checked automatically |
 | Independent evaluation | VERIFIED | `unit/test_performance.py::test_self_eval_rejected`, `::test_parent_and_child_eval_rejected` | |
-| Testing | VERIFIED | 425 tests across unit, integration, security and concurrency | |
+| Testing | VERIFIED | 467 tests across unit, integration, security and concurrency | |
 | Regression prevention | VERIFIED | `unit/test_gen.py::test_committed_codex_plugin_is_up_to_date`, `unit/test_skill_commands.py`; CI in `.github/workflows/ci.yml` (lint and tests, Windows and Ubuntu, Python 3.11 and 3.12) | first run (45842647948) failed on Ubuntu only: a test assumed case-insensitive paths; fixed in `b8a2a74`, then run 45843512290 passed on all four jobs. The Codex discovery test skips on CI, which has no Codex CLI |
 | Evidence integrity | VERIFIED | evidence required, audit chain tamper-evident (see O) | |
 | Live host follows the skill | **BLOCKED** | `live/test_codex_smoke.py::test_codex_follows_skill` (written, **not run**) | uses the owner's Codex quota; runs only with `pytest -m live` after the owner's go-ahead |
@@ -512,3 +512,26 @@ the published hooks documentation says `PreToolUse` can deny a tool call (includ
 | Real process, UTF-8 stdin, non-ASCII path | VERIFIED | `integration/test_cli_hook.py::test_real_process_with_a_non_ascii_path` | |
 | Codex loads the plugin hooks | VERIFIED | `integration/test_codex_hook_discovery.py` (real CLI, throwaway `CODEX_HOME`, no model call) | they stay untrusted until the owner trusts them in `/hooks` |
 | Second host (`cc`) spawn gate | VERIFIED (live) | live on 2026-11-26 with version 2.1.331, in a throwaway AgentOS home: a spawn with no admitted instance was refused with AgentOS's reason; a spawn naming an admitted instance was allowed, bound to the runtime's agent id and moved to RUNNING, and its stop was recorded; `audit verify` passed; repeated SubagentStop seen live, now `::test_repeated_subagent_stop_is_idempotent` | the generated plugin itself was not installed in that host; the hooks were loaded from a local settings file |
+
+## V4.0 Phase 3: Boss loop
+
+Built as ledger checks the host calls (`agentos boss`), not as a new model-calling agent. See
+[docs/BOSS.md](../docs/BOSS.md).
+
+| Responsibility | Status | Evidence | Open |
+| --- | --- | --- | --- |
+| Objective understanding | VERIFIED (record and refuse) | `unit/test_boss.py::test_objective_needs_acceptance_criteria` | the understanding itself is the host's |
+| Complexity assessment | VERIFIED | `::test_objective_records_complexity`, `integration/test_cli_boss.py::test_boss_start_input_checks` | weights uncalibrated |
+| Dynamic decomposition | VERIFIED (validation) | `::test_plan_is_all_or_nothing`, `::test_plan_validation`, `::test_replan_can_build_on_existing_tasks_of_the_objective` | plan quality is the host's |
+| Dependency-aware scheduling | VERIFIED | `::test_schedule_puts_the_critical_path_first`, `::test_schedule_respects_capacity` | advisory |
+| Department creation | VERIFIED | `::test_departments_only_when_the_work_justifies_one` | thresholds hand-picked |
+| Specialist recruitment | VERIFIED | `::test_schedule_flags_tasks_no_template_can_do`, `::test_plan_reports_capability_gaps` | |
+| Recursive workforce expansion | VERIFIED | `::test_large_objectives_may_get_a_department_lead`; depth still capped by admission | suggestion only |
+| Resource allocation | VERIFIED | `::test_schedule_respects_capacity` | |
+| Bottleneck detection | VERIFIED | `::test_bottlenecks`, `::test_orphan_worker_is_a_bottleneck` | stale threshold uncalibrated |
+| Independent quality control | VERIFIED | `::test_accept_needs_independent_passing_evidence` | evaluator identity still unauthenticated (see LIMITATIONS) |
+| Failure recovery | VERIFIED | `::test_recover_retries_with_another_template`, `::test_recover_escalates_when_retries_run_out`, `::test_recover_only_failed_tasks` | |
+| Final delivery | VERIFIED | `::test_delivery_is_gated`, `::test_cancelled_tasks_do_not_block_delivery`, `::test_plans_cannot_change_a_delivered_objective` | |
+| Nine executive functions | VERIFIED (as checks) | `::test_review_covers_every_executive_function` | checks, not workers, by design |
+| No executive workers for routine work | VERIFIED | `::test_no_executive_worker_for_routine_work`, `integration/test_cli_boss.py::test_boss_loop_end_to_end` | |
+| CLI end to end | VERIFIED | `integration/test_cli_boss.py::test_boss_loop_end_to_end` (start, plan, next, admit, evidence, grade, accept, deliver, show, `audit verify`) | not run in a live host session |

@@ -61,6 +61,44 @@ If `status` reports an emergency stop, do not start agents. Tell the user.
    Memory is per project. Never store secrets; AgentOS redacts the obvious ones but you are the
    first line.
 
+## Running a whole objective (the Boss loop)
+
+For work bigger than one task, run it as an objective. AgentOS keeps the plan, the schedule and
+the quality gate; you still decide everything.
+
+1. **State it.** `agentos boss start "title" --statement "what done means" --accept "criterion" --json`
+   needs at least one testable `--accept` criterion. Add all eight complexity flags (the
+   same ones as `plan score`) to record its band.
+2. **Plan it.** Write the decomposition as JSON and apply it in one go:
+   `agentos boss plan <objective> --file plan.json --json`
+   ```json
+   {"tasks": [
+     {"key": "api", "title": "add export endpoint", "capabilities": ["implementation"],
+      "acceptance": ["endpoint returns CSV"], "risk": "low", "priority": 70, "effort": 2},
+     {"key": "docs", "title": "document export", "capabilities": ["documentation"],
+      "depends_on": ["api"], "department": "operations"}
+   ]}
+   ```
+   It is all or nothing: a cycle, unknown dependency or bad field creates no tasks. `capability_gaps`
+   lists capabilities no active template covers; tell the user instead of inventing a template.
+3. **Schedule.** `agentos boss next <objective> --json` lists ready tasks, critical path first,
+   with the free slots, the best template and whether admission would pass. `dispatch` means
+   go (still `agent admit` first), `queued_capacity` means wait, `blocked_by_policy` gives the
+   reasons, `capability_gap` means no template fits. `executive_workers` suggests a department
+   lead only for large objectives; for routine work it is empty, so don't spawn one.
+4. **Watch for trouble.** `agentos boss bottlenecks <objective> --json` (blocked or failed
+   tasks, critical blockers, idle or orphaned workers, full capacity, low budget) and
+   `agentos boss review <objective> --json` (the nine executive checks: operations,
+   engineering, hr, finance, intelligence, security, data, risk, quality).
+5. **Recover.** For a failed task, `agentos boss recover <task> --json` either sends it back
+   for another try (`avoid_templates`, `suggested_template`) or says `escalate_owner`.
+6. **Accept each task.** After the task is done and a different agent graded the worker:
+   `agentos boss accept <task> --eval <evaluation id> --json`. It refuses a low or flagged
+   grade, a grade of a worker on another task, or evidence whose command failed.
+7. **Deliver.** `agentos boss deliver <objective> --criterion 0=<evd id> --json`, giving one
+   `evd_` proof per acceptance criterion (numbered from 0). It refuses while any task is open or
+   unaccepted. `agentos boss show <objective> --json` prints the delivery report.
+
 ## Handing over
 
 Before stopping mid-task, or when another session or host should continue:
