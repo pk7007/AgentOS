@@ -117,7 +117,38 @@ The plugin gives Codex:
   `recovery`) in `plugins/codex/agents/`;
 - an optional **`config-snippet.toml`** that registers those agents and sets
   `max_threads = 4` and `max_depth = 2` to match AgentOS's defaults. Copy what you want
-  into your own Codex config by hand.
+  into your own Codex config by hand;
+- **runtime hooks** (`hooks/hooks.json`) that make Codex itself ask AgentOS before it spawns a
+  subagent. They do nothing until you trust them (next section).
+
+### Turn on enforced admission (hooks)
+
+Without hooks, admission is cooperative: the skill tells Codex to ask `agent admit`
+first, but nothing stops a session that doesn't. With the hooks trusted, Codex runs
+`agentos hook run codex` at three points:
+
+| Codex event | What AgentOS does |
+| --- | --- |
+| before `spawn_agent` | refuses the spawn unless an admitted worker is waiting in this project (an `agent admit` instance in ASSIGNED that no subagent has claimed). Put the instance id in the spawn message to choose one; otherwise the oldest is used. Every spawn is refused during an emergency stop. |
+| subagent starts | binds Codex's agent id to that instance and moves it to RUNNING. A subagent with no ticket is recorded (`runtime.unadmitted_subagent`) and told to stop; Codex doesn't let this hook block it. |
+| subagent stops | records the stop. A cancel or termination you asked for earlier is confirmed automatically, which frees its slot. |
+
+To turn it on, after installing or updating the plugin:
+
+1. Check `agentos --version` works in a **new** terminal; Codex starts the hook by that name.
+2. In Codex, open `/hooks` (desktop app: **Settings > Hooks**), review the three AgentOS hooks
+   and trust them. Codex skips a hook again whenever its content changes, until you re-trust it.
+
+`agentos hook bindings` shows which subagent runs which instance. If the hook itself fails, the
+spawn is refused and other tools are unaffected. Folders that aren't an activated project are
+left alone. `agentos hook config codex` prints the hooks file if you'd rather put it in
+`%USERPROFILE%\.codex\hooks.json` yourself.
+
+Optional and slower: `agentos hook config codex --guard-tools` checks **every** tool call, so a
+cancelled worker's calls are refused. Use that file *instead of* the plugin hooks; if both run,
+a spawn is still claimed only once, but each call starts `agentos` twice. Whether Codex puts the
+subagent's `agent_id` on its tool-call events is not verified yet; without it this guard can't
+tell a worker's calls apart and lets them through.
 
 ## Quickstart
 
@@ -258,7 +289,8 @@ exact parameters, expires (default 60 minutes) and can be used once (`approval c
 ### Emergency stop
 
 `agentos stop` is a big red button anyone can press: no new workers are admitted, and running
-ones can still finish or be cancelled. Lifting it (`stop --lift`) needs the owner.
+ones can still finish or be cancelled. With the runtime hooks on, Codex also refuses every new
+spawn. Lifting it (`stop --lift`) needs the owner.
 
 ## Command reference
 
@@ -279,6 +311,7 @@ not initialized, `3` refused by policy, `4` not found, `5` integrity failure.
 | Memory | `memory add LAYER TEXT`, `memory search QUERY`, `memory inspect ID`, `memory correct ID TEXT`, `memory delete ID`, `memory export [--out FILE]` |
 | Handovers | `handover create --objective --next`, `handover resume ID`, `handover list` |
 | Governance | `limits show / set / host`, `budget set / show / use`, `stop [--lift]`, `approval request / grant / deny / consume / check / list`, `owner pin set / clear / status` |
+| Runtime hooks | `hook run HOST` (run by the host runtime, JSON on stdin), `hook bindings [--all]`, `hook config HOST [--guard-tools]` |
 | Plugins | `gen codex [--out] [--force]`, `gen host --profile FILE --out DIR` |
 
 Every command has `--help`. Commands that act on a project take `--project PATH or ID` and
@@ -366,6 +399,9 @@ Generated files you edit by hand are never overwritten without `--force`.
 | admission says `max_concurrent` but nothing is running | a CANCELLED or unconfirmed TERMINATED agent still holds a slot; once its worker is really gone, `agentos agent confirm-stop <id>` |
 | `cross_project` (exit 3) | run the command from the record's repository, or pass `--project` |
 | `unverified_evidence` (exit 3) | run the check through `agentos evidence run -- <command>` and pass the `evd_` id |
+| Codex refuses a spawn: `no admitted worker is waiting` | admit the worker first (`agent admit` with `--host codex`); spawn only if it is admitted |
+| Codex refuses a spawn: `not admitted and waiting` | the instance id in the spawn message was already used, belongs to another project or isn't ASSIGNED; check `agentos agent list` |
+| the AgentOS hooks never run | trust them in Codex `/hooks`; check `agentos --version` works in a new terminal |
 | `doctor` shows `codex_cli: UNSUPPORTED` | the Codex CLI isn't on PATH; AgentOS still works, the plugin just can't be used |
 
 ## Development

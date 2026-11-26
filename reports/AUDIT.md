@@ -17,9 +17,9 @@ Criterion register over the source spec's audit domains A to AO, for version 0.1
 which criterion Z forbids. The spec's 9/10 target is therefore **not claimed** for this slice.
 A row is VERIFIED only when a test or recorded command shows it.
 
-Evidence paths are relative to `tests/`. Test run at time of writing (after the V4.0 Phase 1
-defect fixes): `python -m pytest -q` gives **381 passed** (the live test is excluded by default).
-Branch coverage is 94% overall: admission 96%, audit 97%, evidence 95%, governance 97%, governor 96%, lifecycle 97%, performance 95%, redact 100%. `ruff check src tests` is clean. A fresh clone of the pre-fix commit `1b7d492` gave
+Evidence paths are relative to `tests/`. Test run at time of writing (after V4.0 Phase 2,
+runtime hooks): `python -m pytest -q` gives **422 passed** (the live test is excluded by
+default). Branch coverage is 95% overall: runtime 93%, hook CLI 100%, admission 96%, audit 97%, evidence 95%, governance 97%, governor 96%, lifecycle 97%, performance 95%, redact 100%. After Phase 1 it was 381 passed. `ruff check src tests` is clean. A fresh clone of the pre-fix commit `1b7d492` gave
 303 passed and a clean ruff run, which is the Phase 0 baseline.
 
 ### Host role
@@ -101,7 +101,7 @@ about what AgentOS *records and enforces*, not about decision quality, which sli
 | --- | --- | --- | --- |
 | Owner authority | VERIFIED | `unit/test_governance.py::test_cannot_forge_confirmation`, `unit/test_governor.py::test_raise_limit_needs_owner`, `unit/test_templates.py::test_retire_requires_owner`, `integration/test_cli_system.py::test_restore_without_owner_denied` | owner types `I APPROVE <action>` at a real console |
 | Approval requirements | VERIFIED | `unit/test_governance.py::test_approval_bound_to_params`, `::test_approval_single_use`, `::test_approval_expires`; `unit/test_governance_edges.py::test_deny_granted_approval_is_refused_and_not_audited` | |
-| Policy enforcement | PARTIAL | admission refuses with every reason: `unit/test_admission.py::test_all_reasons_collected` | **enforcement relies on the host asking**; blocking hooks are slice 2 |
+| Policy enforcement | PARTIAL | admission refuses with every reason: `unit/test_admission.py::test_all_reasons_collected`; with the Codex hooks trusted, the spawn itself is refused without an admitted instance: `unit/test_runtime.py::test_spawn_without_a_ticket_is_denied`, `::test_emergency_stop_denies_spawn_even_with_a_ticket`, `integration/test_cli_hook.py` | hooks work only once the owner trusts them; no live spawn through the hook yet (needs quota); hosts without hooks still rely on asking |
 | Emergency controls | VERIFIED | `unit/test_governance.py::test_stop_blocks_admission_but_allows_winddown`, `integration/test_cli_flows.py::test_emergency_stop_blocks_admission_and_lift_needs_owner` | |
 | Independent oversight | VERIFIED | evaluator independence: `unit/test_performance.py::test_parent_and_child_eval_rejected` | |
 
@@ -173,7 +173,7 @@ about what AgentOS *records and enforces*, not about decision quality, which sli
 | Second host (`cc`) compatibility | UNVERIFIED | `unit/test_gen.py::test_host_generate_uses_profile`; files generated locally from a git-excluded profile | not loaded by the real host yet |
 | Skills compatibility | PARTIAL | `unit/test_skill_commands.py` (every command in the skill parses with the real CLI; score keys exist) | a live host following the skill is BLOCKED (see Q) |
 | MCP integration | NOT BUILT | none | |
-| Hooks and plugin support | PARTIAL | plugin generation verified above; hooks LATER (slice 2) | |
+| Hooks and plugin support | PARTIAL | the plugin ships `hooks/hooks.json`; the real Codex CLI 0.171.0 discovers all three hooks with no errors, untrusted until the owner trusts them: `integration/test_codex_hook_discovery.py` (app-server `hooks/list`, no model call); handler: `unit/test_runtime.py` | a live spawn through the hook is not run yet; `cc` hook file generated, not loaded by that host |
 
 ## O: Observability
 
@@ -201,8 +201,8 @@ about what AgentOS *records and enforces*, not about decision quality, which sli
 | --- | --- | --- | --- |
 | Acceptance criteria | PARTIAL | `task add --accept` is stored | not checked automatically |
 | Independent evaluation | VERIFIED | `unit/test_performance.py::test_self_eval_rejected`, `::test_parent_and_child_eval_rejected` | |
-| Testing | VERIFIED | 303 tests across unit, integration, security and concurrency | |
-| Regression prevention | VERIFIED | `unit/test_gen.py::test_committed_codex_plugin_is_up_to_date`, `unit/test_skill_commands.py` | no CI configured yet |
+| Testing | VERIFIED | 422 tests across unit, integration, security and concurrency | |
+| Regression prevention | VERIFIED | `unit/test_gen.py::test_committed_codex_plugin_is_up_to_date`, `unit/test_skill_commands.py`; CI in `.github/workflows/ci.yml` (lint and tests, Windows and Ubuntu, Python 3.11 and 3.12) | the Codex discovery test skips on CI, which has no Codex CLI |
 | Evidence integrity | VERIFIED | evidence required, audit chain tamper-evident (see O) | |
 | Live host follows the skill | **BLOCKED** | `live/test_codex_smoke.py::test_codex_follows_skill` (written, **not run**) | uses the owner's Codex quota; runs only with `pytest -m live` after the owner's go-ahead |
 
@@ -465,8 +465,8 @@ grade (weighted 100.0) were all accepted. All fixes went test-first; the same te
 
 | # | Suspected defect | Before fix | Fix | Evidence now |
 | --- | --- | --- | --- | --- |
-| D01 | Cooperative-only admission | **Confirmed, architectural**: nothing stops a host that never calls `agent admit` | not fixable in the ledger; needs host hooks (Phase 2) | LIMITATIONS.md |
-| D02 | Missing runtime cancellation | **Confirmed, architectural**: AgentOS has no handle on a host's worker process | slot now held until the host confirms the stop (D03); real cancellation needs runtime adapters (Phase 2) | LIMITATIONS.md |
+| D01 | Cooperative-only admission | **Confirmed, architectural**: nothing stops a host that never calls `agent admit` | **Phase 2, partly fixed**: Codex `PreToolUse` hook on `spawn_agent` refuses a spawn with no admitted ticket; `SubagentStart` binds the native agent and records unadmitted ones | `unit/test_runtime.py`, `integration/test_cli_hook.py`, `integration/test_codex_hook_discovery.py`; open: owner must trust the hooks, no live spawn run yet |
+| D02 | Missing runtime cancellation | **Confirmed, architectural**: AgentOS has no handle on a host's worker process | **Phase 2, partly fixed**: `SubagentStop` confirms a requested cancel (frees the slot); with `--guard-tools` a cancelled worker's tool calls are refused | `unit/test_runtime.py::test_subagent_stop_confirms_a_requested_cancel`, `::test_tool_calls_of_a_cancelled_subagent_are_denied`; open: AgentOS still cannot kill a subagent, and whether Codex sends `agent_id` on tool calls is unverified |
 | D03 | Premature release of active-worker slots | **Confirmed**: CANCELLED, and TERMINATED without confirmation, freed the slot at once | `lifecycle.slot_count` counts them until `agent confirm-stop` or `TERMINATED --confirmed`; archiving them needs confirmation | `test_d03_*`, `unit/test_phase1_features.py::test_confirm_stopped_paths` |
 | D04 | Lifecycle transitions bypassing admission | **Confirmed**: FAILED to ASSIGNED ignored `max_concurrent` and the emergency stop | entering an active state runs admission's `standing_reasons` and reserves another agent run | `test_d04_*`, `::test_reentry_reserves_a_run_and_respects_budget` |
 | D05 | Unauthenticated evaluator identities | **Confirmed**: any string, and instances of other projects, were accepted | evaluator must be a registered instance of the same project, or `owner` with owner confirmation | `test_d05_*`, `unit/test_performance.py::test_owner_may_grade_only_with_confirmation` |
@@ -490,4 +490,25 @@ grade (weighted 100.0) were all accepted. All fixes went test-first; the same te
 - Evaluator identity is bound to a registered instance, not authenticated: a host that knows
   another instance's id can still pass it (D05). Real authentication needs per-agent credentials
   issued by the host runtime (Phase 2).
-- D01 and D02 stay open until runtime adapters exist.
+- D01 and D02 are partly closed by the Phase 2 runtime hooks (below).
+
+---
+
+## V4.0 Phase 2: runtime hooks
+
+Researched before building, not assumed: Codex CLI 0.171.0 reports the `hooks` feature as
+stable and enabled (`codex features list`); the binary contains the events `PreToolUse`,
+`SubagentStart`, `SubagentStop` and the fields `permissionDecision`, `agent_id`, `agent_type`;
+the published hooks documentation says `PreToolUse` can deny a tool call (including the
+`spawn_agent` tool) and `SubagentStart` cannot block.
+
+| What | Status | Evidence | Open |
+| --- | --- | --- | --- |
+| Spawn gate (`PreToolUse` on `spawn_agent`/`Agent`) | VERIFIED in tests | `unit/test_runtime.py::test_spawn_without_a_ticket_is_denied`, `::test_spawn_with_a_ticket_is_allowed_once`, `::test_named_ticket_is_claimed_and_unavailable_names_are_denied`, `::test_ticket_from_another_project_cannot_be_named`, `::test_the_same_spawn_call_checked_twice_claims_one_ticket` | live spawn not run |
+| Fail closed | VERIFIED in tests | `integration/test_cli_hook.py::test_hook_failure_refuses_spawn_but_not_other_tools` | |
+| Binding and RUNNING on start | VERIFIED in tests | `unit/test_runtime.py::test_subagent_start_binds_and_starts_running`, `::test_unadmitted_subagent_is_recorded_and_told` | which `session_id` Codex reports for a subagent is unverified; the binder prefers the same session and falls back to the oldest claim in the project |
+| Stop confirmation | VERIFIED in tests | `::test_subagent_stop_confirms_a_requested_cancel`, `::test_subagent_stop_of_running_work_only_records_it` | |
+| Cancelled worker's tool calls refused (`--guard-tools`) | PARTIAL | `::test_tool_calls_of_a_cancelled_subagent_are_denied`, `::test_emergency_stop_denies_tool_calls_of_bound_subagents` | works only if Codex sends `agent_id` on a subagent's tool calls, unverified |
+| Real process, UTF-8 stdin, non-ASCII path | VERIFIED | `integration/test_cli_hook.py::test_real_process_with_a_non_ascii_path` | |
+| Codex loads the plugin hooks | VERIFIED | `integration/test_codex_hook_discovery.py` (real CLI, throwaway `CODEX_HOME`, no model call) | they stay untrusted until the owner trusts them in `/hooks` |
+| Second host (`cc`) | UNVERIFIED | `unit/test_gen.py::test_host_profile_can_ship_runtime_hooks`; spawn tools `Task`/`Agent` in `::test_cc_host_spawn_tools` | not loaded by that host |

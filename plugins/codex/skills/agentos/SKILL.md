@@ -39,11 +39,15 @@ If `status` reports an emergency stop, do not start agents. Tell the user.
    (for example `max_concurrent`, `dependencies_incomplete`, `capability_mismatch`,
    `high_risk_unproven`, `budget_exceeded:*`, `emergency_stop`) and either wait, do the work
    yourself, or report back. Never switch templates just to get past a reason.
+   When AgentOS runtime hooks are on, the spawn itself is refused without an admitted instance.
+   Put the instance id in the spawn message (`AgentOS instance ag_...`) so the right one is
+   bound. A worker that is told it was not admitted must stop and report.
 5. **Track state.** Move the instance as it works:
    `agentos agent transition <instance> RUNNING` ... `REVIEWING` ... `COMPLETED` or `FAILED`
    (add `--reason`). `agentos task start|done|fail <task>`.
    To stop a worker: `agentos agent transition <instance> CANCELLED`, stop it in your runtime,
-   then `agentos agent confirm-stop <instance>`. Until you confirm, it keeps its slot.
+   then `agentos agent confirm-stop <instance>`. Until you confirm, it keeps its slot. With the
+   runtime hooks on, the stop is confirmed for you when the subagent ends.
    Before a costly step, charge it: `agentos budget use <instance> --tokens N`; exit 3 means skip it.
 6. **Grade with evidence.** First let AgentOS run the check itself:
    `agentos evidence run -- pytest -q` gives an `evd_` id with the real exit code.

@@ -2,12 +2,23 @@
 
 What AgentOS does not do yet, or cannot do at all. Read this before relying on it.
 
-## Enforcement depends on the host asking
+## Enforcement needs the runtime hooks
 
-AgentOS is a ledger and referee that the host session consults. A host that never calls
-`agentos agent admit` can still start workers. Nothing blocks it in slice 1. The skill tells
-the host to ask before every spawn, and every denial is audited, but this is cooperation, not
-enforcement. Hooks that block host actions until AgentOS says yes are planned for slice 2.
+Without hooks, AgentOS is a ledger the host consults: a host that never calls
+`agentos agent admit` can still start workers. With the Codex plugin's hooks trusted, Codex
+itself asks AgentOS before every `spawn_agent` call and refuses spawns that have no admitted
+instance. What that still doesn't cover:
+
+- Hooks run only after the owner trusts them, and Codex skips a hook whose content changed until
+  it is trusted again. Hosts without hooks are back to cooperation.
+- A subagent started some other way is not seen at spawn time. When it starts, AgentOS records
+  it (`runtime.unadmitted_subagent`) and tells it to stop, but Codex doesn't let that hook block.
+- The gate picks the project from the `cwd` the runtime reports.
+- Verified so far: Codex CLI 0.171.0 discovers the three hooks from the plugin (its app-server
+  `hooks/list`, no model call), and the handler follows the documented hook protocol in tests. A
+  live session spawning a real subagent through the hook has **not** been run yet; it needs the
+  owner's go-ahead because it uses quota.
+- The second host (`cc`) hook file is generated but not tested with that host.
 
 ## Owner confirmation trusts the console
 
@@ -38,7 +49,10 @@ AgentOS cannot stop a host's native worker process. Moving an instance to CANCEL
 TERMINATED records the intent. Until the host confirms the worker really stopped
 (`agent confirm-stop`, or `--confirmed`), the instance keeps its concurrency slot and shows as
 `TERMINATED (unconfirmed)`. If a host crashes without confirming, the owner or a later session
-must confirm the stop to free the slot.
+must confirm the stop to free the slot. With the runtime hooks on, the runtime's own
+SubagentStop event confirms it. AgentOS still cannot kill a running subagent; with
+`hook config --guard-tools` its tool calls are refused once it is cancelled, but only if the
+runtime identifies the subagent on those calls, which is unverified for Codex.
 
 ## Secret redaction is pattern-based
 
@@ -75,12 +89,13 @@ for the same idea may not match.
 
 ## Platform
 
-Built and tested on Windows 11 with Python 3.11. The installer is PowerShell only. The Python
-package has no Windows-only code apart from the console check, which falls back to `isatty()`
-elsewhere, but other platforms are untested.
+Built on Windows 11 with Python 3.11. The installer is PowerShell only. The Python package has
+no Windows-only code apart from the console check, which falls back to `isatty()` elsewhere.
+CI (`.github/workflows/ci.yml`) runs lint and the test suite on Windows and Ubuntu with Python
+3.11 and 3.12; macOS is untested.
 
 ## Not in slice 1
 
 Self-improvement experiments, champion/challenger promotion and benchmarks (slice 3); model
-routing and predictive staffing (slice 4); blocking hooks (slice 2); a dashboard; any
+routing and predictive staffing (slice 4); a dashboard; any
 background service. See `reports/AUDIT.md` for the criterion-by-criterion picture.

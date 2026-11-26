@@ -8,5 +8,6 @@
   "agents/researcher.toml": "69b59b8f11092d5ceecaf181cc98d29764be998e2ae03f524aaae7a1054512c5",
   "agents/reviewer.toml": "de3cb84b076cd8622e5952792909c9d8c6bc6a95bb7920a03360744655785fb9",
   "config-snippet.toml": "50fb5aa95b8984e847bbe14e5c99afa2687da9a83c8b1a55da0b8b52463fc361",
-  "skills/agentos/SKILL.md": "57330fef10f10bea1d4f83ef2502ee3a0467902b88e484765f00f3d1e0318efb"
+  "hooks/hooks.json": "7a8c77afbafc7b65b257cce9242ad10fb8ba5834369333f4c39537273a89788d",
+  "skills/agentos/SKILL.md": "8b58d8e54b93fe1d4137cbf7e7fa2dd9ef7635a58677cf6c91a9fb9fcdacb5ad"
 }

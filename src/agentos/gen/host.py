@@ -54,6 +54,11 @@ def _instructions(meta: dict, prof: dict) -> str:
 
 def generate(defs_dir: Path, profile_path: Path, out_dir: Path, force: bool = False) -> GenResult:
     prof = load_profile(profile_path)
+    hooks_text = None
+    if prof.get("hooks_file"):  # validated before anything is written
+        from agentos.runtime import hooks_config
+
+        hooks_text = json.dumps(hooks_config(prof.get("runtime_host", "")), indent=2) + "\n"
     meta = load_plugin_meta(defs_dir)
     agents = load_agents(defs_dir)
     w = Writer(out_dir, force)
@@ -63,4 +68,6 @@ def generate(defs_dir: Path, profile_path: Path, out_dir: Path, force: bool = Fa
     w.write(f"{prof['skills_dir']}/agentos/SKILL.md", skill_text(defs_dir))
     for t in agents:
         w.write(f"{prof['agents_dir']}/{t.id}.md", _agent_md(t))
+    if hooks_text:
+        w.write(prof["hooks_file"], hooks_text)
     return w.finish()

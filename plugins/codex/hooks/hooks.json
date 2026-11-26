@@ -1,0 +1,39 @@
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "^(Agent|spawn_agent)$",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "agentos hook run codex",
+            "timeout": 30,
+            "statusMessage": "AgentOS admission check"
+          }
+        ]
+      }
+    ],
+    "SubagentStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "agentos hook run codex",
+            "timeout": 30
+          }
+        ]
+      }
+    ],
+    "SubagentStop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "agentos hook run codex",
+            "timeout": 30
+          }
+        ]
+      }
+    ]
+  }
+}

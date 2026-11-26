@@ -32,6 +32,32 @@ def test_codex_generate_files(tmp_path):
     assert "model" not in reviewer
     market = json.loads((tmp_path / ".agents" / "plugins" / "marketplace.json").read_text())
     assert market["plugins"][0]["source"] == {"source": "local", "path": "./"}
+    hooks = json.loads((tmp_path / "hooks" / "hooks.json").read_text())["hooks"]
+    assert hooks["PreToolUse"][0]["matcher"] == "^(Agent|spawn_agent)$"
+    assert hooks["SubagentStart"][0]["hooks"][0]["command"] == "agentos hook run codex"
+
+
+def test_host_profile_can_ship_runtime_hooks(tmp_path):
+    profile = tmp_path / "hostx.toml"
+    profile.write_text('manifest_dir = ".hostx"\nmanifest_file = "manifest.json"\n'
+                       'instructions_file = "HOSTX.md"\nagents_dir = "agents"\nskills_dir = "skills"\n'
+                       'hooks_file = "hooks/hooks.json"\nruntime_host = "cc"\n')
+    host.generate(DEFS, profile, tmp_path / "out")
+    hooks = json.loads((tmp_path / "out" / "hooks" / "hooks.json").read_text())["hooks"]
+    assert hooks["PreToolUse"][0]["matcher"] == "^(Agent|Task)$"
+
+
+def test_host_profile_with_unknown_runtime_host_fails(tmp_path):
+    import pytest
+
+    from agentos.errors import UsageError
+
+    profile = tmp_path / "hostx.toml"
+    profile.write_text('manifest_dir = ".hostx"\nmanifest_file = "manifest.json"\n'
+                       'instructions_file = "HOSTX.md"\nagents_dir = "agents"\nskills_dir = "skills"\n'
+                       'hooks_file = "hooks/hooks.json"\n')
+    with pytest.raises(UsageError):
+        host.generate(DEFS, profile, tmp_path / "out")
 
 
 def test_codex_snippet_limits(tmp_path):

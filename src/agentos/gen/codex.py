@@ -5,6 +5,7 @@ from pathlib import Path
 
 from agentos.gen import GenResult, Writer, load_agents, load_plugin_meta, skill_text
 from agentos.gen.tomlw import dumps
+from agentos.runtime import hooks_config
 
 
 def _agent_toml(t) -> str:
@@ -32,6 +33,8 @@ def generate(defs_dir: Path, out_dir: Path, force: bool = False, max_threads: in
     }
     w.write(".codex-plugin/plugin.json", json.dumps(manifest, indent=2) + "\n")
     w.write("skills/agentos/SKILL.md", skill_text(defs_dir))
+    # Codex loads hooks/hooks.json from a plugin root; the owner reviews and trusts them in /hooks.
+    w.write("hooks/hooks.json", json.dumps(hooks_config("codex"), indent=2) + "\n")
     snippet: dict = {"agents": {"max_threads": max_threads, "max_depth": max_depth}}
     for t in agents:
         w.write(f"agents/{t.id}.toml", _agent_toml(t))
