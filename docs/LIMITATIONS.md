@@ -92,7 +92,7 @@ for the same idea may not match.
 Built on Windows 11 with Python 3.11. The installer is PowerShell only. The Python package has
 no Windows-only code apart from the console check, which falls back to `isatty()` elsewhere.
 CI (`.github/workflows/ci.yml`) runs lint and the test suite on Windows and Ubuntu with Python
-3.11 and 3.12; macOS is untested.
+3.11 and 3.12, and passes there; macOS is untested.
 
 ## Not in slice 1
 
