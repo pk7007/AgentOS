@@ -26,6 +26,7 @@ def generate(defs_dir: Path, out_dir: Path, force: bool = False, max_threads: in
     w = Writer(out_dir, force)
     manifest = {
         "name": meta["name"], "version": meta["version"], "description": meta["description"],
+        "author": {"name": meta.get("author", meta["display_name"])},
         "license": "MIT", "keywords": ["agents", "orchestration", "governance", "audit"],
         "skills": "./skills/",
         "interface": {"displayName": meta["display_name"], "shortDescription": meta["description"],

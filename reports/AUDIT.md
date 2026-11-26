@@ -17,9 +17,9 @@ Criterion register over the source spec's audit domains A to AO, for version 0.1
 which criterion Z forbids. The spec's 9/10 target is therefore **not claimed** for this slice.
 A row is VERIFIED only when a test or recorded command shows it.
 
-Evidence paths are relative to `tests/`. Test run at time of writing (after V4.0 Phase 5,
-self-improvement): `python -m pytest -q` gives **596 passed** (the live test is excluded by
-default). Branch coverage is 95% overall: improve 98%, policy 100%, improve CLI 96%, recruit 93%, templates 95%, factory 93%, workforce 97%, boss 92%, runtime 93%, hook CLI 100%, admission 96%, audit 97%, evidence 95%, governance 97%, governor 96%, lifecycle 97%, performance 95%, redact 100%. After Phase 4 it was 537 passed, after Phase 3 467, after Phase 2 425, after Phase 1 381. `ruff check src tests` is clean. A fresh clone of the pre-fix commit `1b7d492` gave
+Evidence paths are relative to `tests/`. Test run at time of writing (after V4.0 Phase 6,
+host integration): `python -m pytest -q` gives **621 passed** (the live test is excluded by
+default). Branch coverage is 95% overall: adapters 93%, host CLI 100%, improve 98%, policy 100%, improve CLI 96%, recruit 93%, templates 95%, factory 93%, workforce 97%, boss 92%, runtime 93%, hook CLI 100%, admission 96%, audit 97%, evidence 95%, governance 97%, governor 96%, lifecycle 97%, performance 95%, redact 100%. After Phase 5 it was 596 passed, after Phase 4 537, after Phase 3 467, after Phase 2 425, after Phase 1 381. `ruff check src tests` is clean. A fresh clone of the pre-fix commit `1b7d492` gave
 303 passed and a clean ruff run, which is the Phase 0 baseline.
 
 ### Host role
@@ -34,7 +34,7 @@ about what AgentOS *records and enforces*, not about decision quality, which sli
 
 | Criterion | Status | Evidence | Notes |
 | --- | --- | --- | --- |
-| Modularity | VERIFIED | one module per concern under `src/agentos/`; each has its own unit test file | 25 core modules, a 4-file generator package, 18 CLI command modules |
+| Modularity | VERIFIED | one module per concern under `src/agentos/`; each has its own unit test file | 26 core modules, a 4-file generator package, 19 CLI command modules |
 | Extensibility | PARTIAL | `cli/__init__.py` `COMMAND_MODULES`; `gen/host.py` profiles (`unit/test_gen.py::test_host_generate_uses_profile`) | adding a command or host needs no core change; no plugin API for third parties |
 | Separation of concerns | VERIFIED | CLI handlers call core functions only; core never imports `cli` | the owner prompt lives in `governance` |
 | Dependency boundaries | VERIFIED | `pyproject.toml`: one runtime dependency (pydantic) | stdlib for SQLite, TOML, argparse |
@@ -170,7 +170,7 @@ about what AgentOS *records and enforces*, not about decision quality, which sli
 | Criterion | Status | Evidence | Notes |
 | --- | --- | --- | --- |
 | Codex compatibility | VERIFIED | Codex CLI 0.171.0, in a throwaway `CODEX_HOME`: `codex plugin marketplace add plugins/codex` then `codex plugin add agentos@agentos` gave "installed, enabled" (skill and 6 agent files in its cache) | install only; no model session was run |
-| Second host (`cc`) compatibility | UNVERIFIED | `unit/test_gen.py::test_host_generate_uses_profile`; files generated locally from a git-excluded profile | not loaded by the real host yet |
+| Second host (`cc`) compatibility | VERIFIED (validate) | `agentos host install cc` from a git-excluded profile; the host's own `plugin validate` (version 2.1.181) passed with no warnings on the installed folder; live spawn gate below | the installed plugin was validated, not loaded into a live session |
 | Skills compatibility | PARTIAL | `unit/test_skill_commands.py` (every command in the skill parses with the real CLI; score keys exist) | a live host following the skill is BLOCKED (see Q) |
 | MCP integration | NOT BUILT | none | |
 | Hooks and plugin support | PARTIAL | the plugin ships `hooks/hooks.json`; the real Codex CLI 0.171.0 discovers all three hooks with no errors, untrusted until the owner trusts them: `integration/test_codex_hook_discovery.py` (app-server `hooks/list`, no model call); handler: `unit/test_runtime.py` | a live spawn through the Codex hook is not run yet (no quota); the `cc` host ran it live (see Phase 2) |
@@ -254,7 +254,7 @@ about what AgentOS *records and enforces*, not about decision quality, which sli
 | Skill versioning | PARTIAL | the skill ships inside the versioned plugin (0.1.0) | no per-skill version |
 | Policy versioning | NOT BUILT | limits changes are audited, not versioned | |
 | Migration | VERIFIED | `unit/test_db.py::test_migrate_idempotent`, `integration/test_cli_system.py::test_restore_rejects_newer_schema` | one migration so far |
-| Rollback | PARTIAL | restore from backup (see AK) | no template rollback command |
+| Rollback | VERIFIED | restore from backup (see AK); plugin updates: `unit/test_adapters.py::test_update_backs_up_and_rollback_restores_exactly`; promoted changes: `unit/test_improve.py` (monitor rollback) | no release rollback (see AK) |
 
 ## W: Workflow engineering
 
@@ -271,10 +271,10 @@ about what AgentOS *records and enforces*, not about decision quality, which sli
 | Criterion | Status | Evidence | Notes |
 | --- | --- | --- | --- |
 | Handover quality | VERIFIED | `unit/test_handover.py::test_create_and_resume_cross_host`, `::test_head_advanced_and_diverged`, `::test_dirty_tree_warning` | |
-| Configuration synchronization | PARTIAL | both hosts are generated from one set of definitions | the second host is UNVERIFIED (see N) |
+| Configuration synchronization | VERIFIED | both hosts from one set of definitions; `host drift` finds stale installs: `unit/test_adapters.py::test_drift_finds_hand_edits_deletions_stale_definitions_and_host_updates` | |
 | Shared learning | VERIFIED | one memory store for all hosts on the machine | |
 | Session recovery | VERIFIED | `unit/test_handover.py::test_second_resume_denied` (single claim), `integration/test_cli_handover.py` | |
-| Compatibility verification | PARTIAL | Codex plugin install verified; second host not | |
+| Compatibility verification | PARTIAL | Codex plugin accepted by Codex 0.171.0; second host plugin validated by the host; cross-host work both ways through the CLI: `integration/test_cli_host.py::test_work_and_learning_cross_hosts_both_ways` | live Codex session BLOCKED (no quota) |
 
 ## Y: Deployment readiness
 
@@ -363,7 +363,7 @@ about what AgentOS *records and enforces*, not about decision quality, which sli
 | Criterion | Status | Evidence | Notes |
 | --- | --- | --- | --- |
 | Existing framework integration | NOT BUILT | none | |
-| ECC compatibility | NOT BUILT | none | |
+| ECC compatibility | VERIFIED (static) | `agentos host check cc` against the installed ECC plugin: compatible (its PreToolUse hooks run alongside; same-named agents are namespaced; no duplicate AgentOS hooks); `unit/test_adapters.py::test_check_*` | not exercised in a live session with both loaded |
 | Portable skills | VERIFIED | one vendor-neutral skill copied to every host (`unit/test_gen.py`) | |
 | Adapter architecture | VERIFIED | `gen/host.py` profiles | |
 | Standard schemas | PARTIAL | JSON output on every command (`--json`) | no published schema files |
@@ -599,3 +599,29 @@ stays zero; trials are ordinary admissions under the same limits and budgets.
 | No unauthorized self-modification | VERIFIED | `::test_experiments_cannot_touch_permissions_or_security`, `unit/test_policy.py::test_sensitive_or_unknown_names_are_not_tunable`, `::test_values_must_stay_within_bounds`, `integration/test_cli_improve.py::test_replacing_a_working_template_needs_the_owner` | |
 | May improve recruitment, staffing, planning, skills, context, non-sensitive architecture | PARTIAL | recruitment weights (`unit/test_policy.py::test_recruitment_ranks_with_the_stored_and_overridden_weights`); staffing, planning and context through lead/planner instructions; skills through memory | no architectural component other than recruitment weights is tunable yet |
 | Never ownership, security boundaries, approvals, hard limits | VERIFIED (by design) | none of them is in `policy.REGISTRY` or the tunable template fields; refused as `not_tunable` | |
+
+## V4.0 Phase 6: Host integration
+
+See [docs/HOSTS.md](../docs/HOSTS.md) for the compatibility reports. Versions checked on
+2026-11-27: codex-cli 0.171.0 and the second host 2.1.181. The current official documentation
+for both was read the same day (plugin layout, hooks, agents, instructions files).
+
+| Requirement | Status | Evidence | Open |
+| --- | --- | --- | --- |
+| Dedicated native adapters for both platforms | VERIFIED | `src/agentos/adapters.py` (Codex built in; second host from a git-excluded profile): `unit/test_adapters.py::test_codex_needs_no_profile_and_the_other_host_does`, `::test_install_writes_the_plugin_and_records_it` | |
+| Installed versions and official docs checked | VERIFIED | `agentos host list` reads each CLI's `--version`; findings in HOSTS.md (Codex manifest fallback path, `max_threads` alias, trusted plugin hooks; `Agent` is the second host's spawn tool) | |
+| Canonical definitions, per-platform generators | VERIFIED | `definitions/` feeds `gen/codex.py` and `gen/host.py`; `unit/test_gen.py::test_committed_codex_plugin_is_up_to_date` | |
+| Global installation | VERIFIED | `scripts/install.ps1` (`integration/test_install_script.py`) and `agentos host install`; Codex accepted the installed folder as a marketplace, the second host validated it | registering with the host is the user's step |
+| Per-project activation | VERIFIED | `project activate` plus `host bootstrap`: `unit/test_adapters.py::test_bootstrap_manages_only_its_own_block`, `::test_bootstrap_needs_an_active_project` | |
+| Concise bootstrap instructions | VERIFIED | a short managed block; `::test_bootstrap_creates_and_removes_a_file_of_its_own` | |
+| Native skills | VERIFIED | `skills/agentos/SKILL.md` in both plugins; every command in it parses (`unit/test_skill_commands.py`) | |
+| Native agents | VERIFIED | Codex custom agent TOML files; second host agent Markdown with front matter, accepted by its validator | |
+| Supported hooks | VERIFIED | PreToolUse (spawn tool), SubagentStart, SubagentStop for both; Codex discovery test; second host live gate (Phase 2) | Codex live spawn BLOCKED |
+| Shared persistent intelligence | VERIFIED | one ledger for both hosts; memory written under one host is found under the other: `integration/test_cli_host.py::test_work_and_learning_cross_hosts_both_ways` | |
+| Safe cross-platform handovers | VERIFIED | same test, both directions; single claim, Git warnings, redaction (`unit/test_handover.py`) | |
+| Configuration drift detection | VERIFIED | `::test_drift_finds_hand_edits_deletions_stale_definitions_and_host_updates`, `integration/test_cli_host.py::test_install_drift_rollback_and_bootstrap`; also run against a real install folder | |
+| Reversible updates | VERIFIED | `::test_update_backs_up_and_rollback_restores_exactly`, `::test_uninstall_keeps_files_you_edited`, `::test_install_refuses_a_folder_it_does_not_own` | |
+| ECC compatibility | VERIFIED (static) | `host check cc` against the installed ECC plugin: compatible; `::test_check_reports_shared_hooks_and_names_but_stays_compatible`, `::test_check_flags_a_second_agentos_install` | no live session with both loaded |
+| Real task Codex to second host | BLOCKED | ledger path VERIFIED (`[codex-cc]`); a live Codex session needs quota this account does not have | run `tests/live` when quota returns |
+| Real task second host to Codex | BLOCKED | ledger path VERIFIED (`[cc-codex]`); same blocker | |
+| No raw conversation history transferred | VERIFIED | handovers hold structured fields only; the test asserts no transcript fields | |

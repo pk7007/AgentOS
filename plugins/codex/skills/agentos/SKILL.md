@@ -158,6 +158,17 @@ A change replaces nothing until it beats the current champion in an experiment:
    lower pass rate, two or more evaluators and nothing flagged; otherwise it rejects and remembers why.
 5. `agentos improve monitor --json` rolls a promoted change back if later grades fall below its baseline.
 
+## Installing and updating the plugin
+
+- `agentos host list --json` shows each host, its CLI version and its install.
+- `agentos host install codex --json` installs or updates the plugin (backing up the previous
+  files) and prints the command that registers it with the host. Ask the user to run that command.
+- `agentos host drift codex --json` reports hand edits, stale files and host updates (exit 3);
+  `agentos host rollback codex --json` undoes the last update.
+- `agentos host bootstrap codex --json` adds the short AgentOS block to this project's
+  instructions file (`--remove` takes it out).
+- `agentos host check codex --json` checks coexistence with other plugins.
+
 ## Handing over
 
 Before stopping mid-task, or when another session or host should continue:

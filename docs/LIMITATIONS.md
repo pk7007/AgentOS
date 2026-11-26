@@ -120,9 +120,21 @@ for the same idea may not match.
   throwaway `CODEX_HOME`). A live Codex session following the skill end to end has **not** been
   run yet. `tests/live/test_codex_smoke.py` does that, and runs only with `pytest -m live` and
   the owner's go-ahead, since it uses the signed-in account's quota.
+- **The second host (`cc`):** the plugin written by `agentos host install cc` passes that
+  host's own `plugin validate` (version 2.1.181). It has not been loaded into a live session.
 - **Other hosts:** `agentos gen host` writes plugin files from a profile
   ([HOST_PROFILE.md](HOST_PROFILE.md)). Whether a given host loads them is unverified until
   someone checks with that host's CLI.
+- **Installing is two steps.** `agentos host install` writes the plugin into a folder AgentOS
+  owns; registering it with the host (for Codex `codex plugin marketplace add`, then enabling
+  it) is the user's step, because AgentOS never edits a host's configuration. Plugin hooks also
+  need the user's trust in the host before they run.
+- **Cross-host continuation is verified on the ledger, not live.** Work moving between the hosts
+  in both directions is tested through the real CLI (`integration/test_cli_host.py`). A live
+  Codex session is BLOCKED (no quota), so a task started in a live Codex session and resumed in
+  the other host, or the reverse, has not been run. See [HOSTS.md](HOSTS.md).
+- **`host check` reads files, not a host's resolved configuration.** It scans the folders the
+  profile names; plugins installed elsewhere, or managed settings, are not seen.
 
 ## Platform
 

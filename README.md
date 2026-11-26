@@ -32,6 +32,7 @@ It runs entirely on your machine: no server, no network calls, no cost.
 - [Owner-only actions](#owner-only-actions)
 - [Where your data lives](#where-your-data-lives)
 - [Other hosts](#other-hosts)
+- [Host adapters](#host-adapters)
 - [Troubleshooting](#troubleshooting)
 - [Development](#development)
 - [Project layout](#project-layout)
@@ -360,6 +361,7 @@ not initialized, `3` refused by policy, `4` not found, `5` integrity failure.
 | Governance | `limits show / set / host`, `budget set / show / use`, `stop [--lift]`, `approval request / grant / deny / consume / check / list`, `owner pin set / clear / status` |
 | Runtime hooks | `hook run HOST` (run by the host runtime, JSON on stdin), `hook bindings [--all]`, `hook config HOST [--guard-tools]` |
 | Plugins | `gen codex [--out] [--force]`, `gen host --profile FILE --out DIR` |
+| Host adapters | `host list`, `host install HOST [--dest DIR] [--profile F]`, `host drift HOST`, `host rollback HOST`, `host uninstall HOST [--force]`, `host bootstrap HOST [--remove]`, `host check HOST`, `host history [HOST]` |
 
 Every command has `--help`. Commands that act on a project take `--project PATH or ID` and
 default to the current directory. Commands that act on one task, agent or evidence record by id
@@ -435,6 +437,17 @@ Any host that loads plugins from a folder of files can be described with a five-
 profile, and `agentos gen host --profile <file> --out <dir>` writes its manifest, agents,
 skill and a short instructions file. See [docs/HOST_PROFILE.md](docs/HOST_PROFILE.md).
 Generated files you edit by hand are never overwritten without `--force`.
+
+## Host adapters
+
+`agentos host install codex` (or `cc`, with a profile) writes the plugin into a folder AgentOS
+owns and prints the one command that registers it with the host; it never edits the host's own
+configuration. Every update backs up the previous files, hand edits included, and
+`host rollback` restores them. `host drift` reports hand edits, definitions that changed since
+the install and host CLI updates. `host bootstrap` adds a short, removable block to a project's
+instructions file, and `host check` reports how AgentOS coexists with other plugins such as
+ECC. Work moves between hosts through handovers and the shared ledger, never through
+conversation history. Details and the compatibility reports: [docs/HOSTS.md](docs/HOSTS.md).
 
 ## Troubleshooting
 

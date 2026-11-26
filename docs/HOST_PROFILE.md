@@ -54,3 +54,21 @@ Both are skipped and listed under `skipped_modified`. Pass `--force` to overwrit
   config.** Copy what you want into it yourself.
 - `.agents/plugins/marketplace.json`: a local marketplace entry, so the folder can be added
   as a plugin source.
+
+## Adapter keys
+
+Optional keys, used by the native adapter (`agentos host ...`, see [HOSTS.md](HOSTS.md)):
+
+```toml
+hooks_file          = "hooks/hooks.json"  # write the runtime hooks here
+runtime_host        = "cc"                # which `agentos hook run <host>` the hooks call (required with hooks_file)
+executable          = "myhost"            # the host CLI, for `--version` in `host list` and drift
+plugins_dir         = "~/.myhost/plugins" # scanned by `host check` for other plugins' hooks and agents
+agents_home         = "~/.myhost/agents"  # user-level agents, also scanned by `host check`
+register_hint       = "myhost plugin add {dest}"  # printed after `host install`
+plugin_instructions = false               # skip the instructions file at the plugin root
+```
+
+`agentos host install cc` looks for the profile at `~/.agentos/hosts/cc.toml`, then at
+`hosts/cc.local.toml` in a checkout (git-excluded).
+

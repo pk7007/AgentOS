@@ -63,8 +63,11 @@ def generate(defs_dir: Path, profile_path: Path, out_dir: Path, force: bool = Fa
     agents = load_agents(defs_dir)
     w = Writer(out_dir, force)
     manifest = {"name": meta["name"], "version": meta["version"], "description": meta["description"]}
+    if meta.get("author"):
+        manifest["author"] = {"name": meta["author"]}
     w.write(f"{prof['manifest_dir']}/{prof['manifest_file']}", json.dumps(manifest, indent=2) + "\n")
-    w.write(prof["instructions_file"], _instructions(meta, prof))
+    if prof.get("plugin_instructions", True):  # some hosts ignore it at a plugin root (use `host bootstrap`)
+        w.write(prof["instructions_file"], _instructions(meta, prof))
     w.write(f"{prof['skills_dir']}/agentos/SKILL.md", skill_text(defs_dir))
     for t in agents:
         w.write(f"{prof['agents_dir']}/{t.id}.md", _agent_md(t))

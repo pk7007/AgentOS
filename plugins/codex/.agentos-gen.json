@@ -1,6 +1,6 @@
 {
   ".agents/plugins/marketplace.json": "2c1dfae8e2ccd10578c93d8fff53ef812983568fc330a123afbd735d945e51dd",
-  ".codex-plugin/plugin.json": "2e8d89ebc95081cfa03a8dfcd749e833f96b89334f996ea7e212b4c8dd516fca",
+  ".codex-plugin/plugin.json": "877fdeef69b225ae4c12281631272fdee87dee97f68374aa475e631eb40050d3",
   "agents/implementer.toml": "bd4630425692272700730b9483ca2f0669bcbe0894c8d63faf63fc447f6cceb1",
   "agents/lead.toml": "548da44c5c137c0b9525a71469381cb7b43556d49dc9cf98e5aa1b9d2d955cda",
   "agents/planner.toml": "1f523938c86406ebf6a5f084a0012f8bbead0814be108ae5d6564edb9e09dce2",
@@ -9,5 +9,5 @@
   "agents/reviewer.toml": "de3cb84b076cd8622e5952792909c9d8c6bc6a95bb7920a03360744655785fb9",
   "config-snippet.toml": "50fb5aa95b8984e847bbe14e5c99afa2687da9a83c8b1a55da0b8b52463fc361",
   "hooks/hooks.json": "7a8c77afbafc7b65b257cce9242ad10fb8ba5834369333f4c39537273a89788d",
-  "skills/agentos/SKILL.md": "7c3106f5ad7a7b7723da3cdcdc3a4090195e9a91cb52f4c5fc3a4f060f3248e0"
+  "skills/agentos/SKILL.md": "f5aeb0abc59d39914d9368a2aa755d5c0d67530c8f049e6659bd5a91369623ea"
 }
