@@ -465,7 +465,16 @@ def accept_task(conn: sqlite3.Connection, task_id: str, evaluation_id: str, acto
                                 "weighted": round(ev.weighted, 2)}, task.project_id)
     if denied:
         raise denied
-    return {"task_id": task_id, "accepted": True, "evaluation_id": evaluation_id, "evidence_id": passing}
+    from agentos import improve
+
+    retro = improve.retro(conn, task.project_id, actor, task_id=task_id)
+    return {"task_id": task_id, "accepted": True, "evaluation_id": evaluation_id, "evidence_id": passing,
+            "retrospective": _retro_brief(retro)}
+
+
+def _retro_brief(retro: dict) -> dict:
+    return {"id": retro["id"], "weaknesses": len(retro["weaknesses"]), "hypotheses": len(retro["hypotheses"]),
+            "next": f"agentos improve retro --show {retro['id']}" if retro["hypotheses"] else None}
 
 
 def recover(conn: sqlite3.Connection, task_id: str, actor: str) -> dict:
@@ -625,7 +634,10 @@ def deliver(conn: sqlite3.Connection, objective_id: str, criteria_evidence: dict
             dissolve_departments(conn, obj.id, actor)
     if denied:
         raise denied
-    return {"objective": get_objective(conn, obj.id).model_dump(), **report}
+    from agentos import improve
+
+    retro = improve.retro(conn, obj.project_id, actor, objective_id=obj.id)
+    return {"objective": get_objective(conn, obj.id).model_dump(), **report, "retrospective": _retro_brief(retro)}
 
 
 def delivery_report(conn: sqlite3.Connection, objective_id: str) -> dict | None:

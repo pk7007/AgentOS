@@ -19,6 +19,8 @@ class TemplateStatus(str, Enum):
     suspended = "suspended"
     quarantined = "quarantined"
     retired = "retired"
+    # An experiment's challenger: never recruited, admitted only on that experiment's trial tasks.
+    candidate = "candidate"
 
 
 class AgentTemplate(BaseModel):
@@ -52,6 +54,9 @@ _ALLOWED: dict[tuple[TemplateStatus, TemplateStatus], bool] = {
     (A.quarantined, A.active): True,
     (A.quarantined, A.retired): True,
     (A.retired, A.active): True,
+    # A challenger is promoted by copying its fields into the champion, never by activating it.
+    (A.candidate, A.quarantined): False,
+    (A.candidate, A.retired): False,
 }
 
 _BODY_EXCLUDE = {"id", "version", "status"}

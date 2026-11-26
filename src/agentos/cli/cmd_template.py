@@ -45,6 +45,11 @@ def cmd_add(args, ctx):
             t = AgentTemplate(**load_toml(args.file))
         except ValidationError as exc:
             raise UsageError(f"invalid template {args.file}: {exc.errors()[0]['msg']}") from exc
+        if conn.execute("SELECT 1 FROM agent_templates WHERE id=?", (t.id,)).fetchone():
+            # Changing a working template goes through an experiment (agentos improve) or the owner.
+            from agentos.cli import owner_guard
+
+            owner_guard(f"replace template {t.id}", ctx)
         return templates.add_template(conn, t, ctx.actor).model_dump(mode="json")
     finally:
         conn.close()

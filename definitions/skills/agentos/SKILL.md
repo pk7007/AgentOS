@@ -132,6 +132,32 @@ Keep the workforce matched to the work:
 - `agentos workforce contract --json` archives finished workers, expires temporary specialists and
   dissolves departments with nothing open.
 
+## Learning from the work (self-improvement)
+
+`boss accept` and `boss deliver` run a retrospective automatically; you can also run
+`agentos improve retro [--task <task>] --json`. It lists what worked, what didn't, recurring
+weaknesses (weak sub-scores, failing evidence, repeated admission refusals) and hypotheses: a
+concrete change to a template's instructions or to a recruitment weight.
+
+A change replaces nothing until it beats the current champion in an experiment:
+
+1. Fix the benchmark cases first, each with the command that checks it:
+   `agentos improve case --suite <suite> --title "..." --split representative|heldout --cap <capability> --json -- <command...>`.
+   You need at least 3 representative and 2 held-out cases; held-out cases are listed by hash only.
+2. `agentos improve propose --suite <suite> --from-retro <retro> --json` (or `--template <id> --file changes.toml`
+   with `instructions`, `description`, `reasoning_hint` or `model_hint`, or `--policy <name> --value <n>`).
+   Permissions, security class, delegation, approvals, limits and ownership cannot be changed this
+   way. The challenger is a separate `candidate` template that only runs on its own trials.
+3. For every case and both arms: `agentos improve trial <experiment> <case> --arm champion|challenger --host <host> --json`,
+   spawn the admitted worker on that trial task, then `agentos improve check <trial> --json` (AgentOS runs
+   the case's command). Have a reviewer of neither arm's template grade the worker citing that
+   evidence, and attach it: `agentos improve score <trial> <evaluation> --json`. Trials are labelled A/B;
+   don't tell the reviewer which arm it is grading.
+4. `agentos improve gate <experiment> --json -- <full test suite command>`, then `agentos improve decide <experiment> --json`.
+   It promotes only with a clear margin on representative cases, no loss on held-out cases, no
+   lower pass rate, two or more evaluators and nothing flagged; otherwise it rejects and remembers why.
+5. `agentos improve monitor --json` rolls a promoted change back if later grades fall below its baseline.
+
 ## Handing over
 
 Before stopping mid-task, or when another session or host should continue:
@@ -146,7 +172,8 @@ Resume can be claimed once. Read its `warnings` (`head_advanced`, `head_diverged
 
 ## Things only the human owner can do
 
-Raising limits, setting a paid budget above zero, retiring templates, restore, lifting an
+Raising limits, setting a paid budget above zero, retiring templates, replacing a working template
+by hand (`template add` with an existing id), restore, lifting an
 emergency stop, granting approvals (including `admit_high_risk` for high-risk tasks). These ask the owner to type a confirmation at a real terminal. You cannot do
 them, and you must not try to work around them. Ask the user.
 

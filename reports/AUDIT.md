@@ -17,9 +17,9 @@ Criterion register over the source spec's audit domains A to AO, for version 0.1
 which criterion Z forbids. The spec's 9/10 target is therefore **not claimed** for this slice.
 A row is VERIFIED only when a test or recorded command shows it.
 
-Evidence paths are relative to `tests/`. Test run at time of writing (after V4.0 Phase 4,
-workforce): `python -m pytest -q` gives **537 passed** (the live test is excluded by
-default). Branch coverage is 95% overall: factory 93%, workforce 97%, boss 92%, runtime 93%, hook CLI 100%, admission 96%, audit 97%, evidence 95%, governance 97%, governor 96%, lifecycle 97%, performance 95%, redact 100%. After Phase 3 it was 467 passed, after Phase 2 425, after Phase 1 381. `ruff check src tests` is clean. A fresh clone of the pre-fix commit `1b7d492` gave
+Evidence paths are relative to `tests/`. Test run at time of writing (after V4.0 Phase 5,
+self-improvement): `python -m pytest -q` gives **596 passed** (the live test is excluded by
+default). Branch coverage is 95% overall: improve 98%, policy 100%, improve CLI 96%, recruit 93%, templates 95%, factory 93%, workforce 97%, boss 92%, runtime 93%, hook CLI 100%, admission 96%, audit 97%, evidence 95%, governance 97%, governor 96%, lifecycle 97%, performance 95%, redact 100%. After Phase 4 it was 537 passed, after Phase 3 467, after Phase 2 425, after Phase 1 381. `ruff check src tests` is clean. A fresh clone of the pre-fix commit `1b7d492` gave
 303 passed and a clean ruff run, which is the Phase 0 baseline.
 
 ### Host role
@@ -34,7 +34,7 @@ about what AgentOS *records and enforces*, not about decision quality, which sli
 
 | Criterion | Status | Evidence | Notes |
 | --- | --- | --- | --- |
-| Modularity | VERIFIED | one module per concern under `src/agentos/`; each has its own unit test file | 23 core modules, a 4-file generator package, 17 CLI command modules |
+| Modularity | VERIFIED | one module per concern under `src/agentos/`; each has its own unit test file | 25 core modules, a 4-file generator package, 18 CLI command modules |
 | Extensibility | PARTIAL | `cli/__init__.py` `COMMAND_MODULES`; `gen/host.py` profiles (`unit/test_gen.py::test_host_generate_uses_profile`) | adding a command or host needs no core change; no plugin API for third parties |
 | Separation of concerns | VERIFIED | CLI handlers call core functions only; core never imports `cli` | the owner prompt lives in `governance` |
 | Dependency boundaries | VERIFIED | `pyproject.toml`: one runtime dependency (pydantic) | stdlib for SQLite, TOML, argparse |
@@ -62,7 +62,7 @@ about what AgentOS *records and enforces*, not about decision quality, which sli
 | Role separation | VERIFIED | read-only reviewer and researcher templates; no self-grading: `unit/test_performance.py::test_self_eval_rejected`, `::test_parent_and_child_eval_rejected` | |
 | Dynamic departments | VERIFIED | dissolution: `unit/test_workforce.py::test_contract_archives_dissolves_and_expires`, `::test_dissolved_department_can_form_again`; creation: `unit/test_boss.py::test_departments_only_when_the_work_justifies_one`, `::test_large_objectives_may_get_a_department_lead`, `::test_no_executive_worker_for_routine_work` | departments are ledger records; a lead worker is only suggested |
 | Managerial effectiveness | NOT BUILT | none | not measurable in slice 1 |
-| Organizational adaptability | LATER (slice 3) | none | needs benchmarks |
+| Organizational adaptability | PARTIAL | templates and recruitment weights change through validated experiments: `unit/test_improve.py::test_a_better_challenger_is_promoted_into_the_champion`, `::test_a_better_policy_is_promoted_then_monitored` | not measured across real objectives |
 
 ## D: Dynamic recruitment
 
@@ -123,7 +123,7 @@ about what AgentOS *records and enforces*, not about decision quality, which sli
 | Context understanding | NOT BUILT | none | host's job |
 | Capability matching | VERIFIED | see D: candidate selection | |
 | Evidence synthesis | PARTIAL | evaluations require an `evd_` record AgentOS ran itself: `security/test_phase1_defects.py::test_d06_free_text_evidence_alone_is_rejected`, `unit/test_phase1_features.py::test_evidence_records_what_really_happened` | the host still chooses which command proves what |
-| Organizational effectiveness | LATER (slice 3) | none | needs benchmarks |
+| Organizational effectiveness | UNVERIFIED | benchmark cases now exist (`improve case`), but no real-outcome benchmark has been run | needs real objectives graded over time |
 
 ## J: Job orchestration
 
@@ -150,10 +150,10 @@ about what AgentOS *records and enforces*, not about decision quality, which sli
 | Criterion | Status | Evidence | Notes |
 | --- | --- | --- | --- |
 | Feedback capture | VERIFIED | evaluations: `unit/test_performance.py` | |
-| Failure analysis | PARTIAL | `failure` memory layer, failure rate in summaries | no analysis tooling |
-| Improvement hypotheses | LATER (slice 3) | none | |
-| Experimentation | LATER (slice 3) | none | |
-| Learning retention | PARTIAL | memory persists across sessions and hosts | no measure of reuse |
+| Failure analysis | VERIFIED | `improve retro` diagnoses weak sub-scores, failing evidence and recurring refusals: `unit/test_improve.py::test_retro_diagnoses_weaknesses_and_proposes_a_testable_change`, `::test_recurring_capability_mismatches_suggest_a_recruitment_policy` | thresholds hand-picked |
+| Improvement hypotheses | VERIFIED (rule-based) | same tests; a tried change or a busy target is not proposed again | fixed addenda, not model-written |
+| Experimentation | VERIFIED | champion versus challenger: see "V4.0 Phase 5" | small case counts |
+| Learning retention | PARTIAL | memory persists across sessions and hosts; promotions write validated org memory: `::test_a_better_challenger_is_promoted_into_the_champion` | no measure of reuse |
 
 ## M: Model routing
 
@@ -232,7 +232,7 @@ about what AgentOS *records and enforces*, not about decision quality, which sli
 | --- | --- | --- | --- |
 | Capability registry | VERIFIED | `unit/test_templates.py::test_versioning`, `::test_seed_definitions_load` | |
 | Performance history | VERIFIED | `unit/test_performance.py::test_bands_and_retain` | |
-| Promotion | LATER (slice 3) | none | |
+| Promotion | VERIFIED | a challenger becomes a new champion version only through `improve decide`: `unit/test_improve.py::test_a_better_challenger_is_promoted_into_the_champion`, `::test_a_weaker_challenger_is_rejected_and_remembered` | |
 | Reassignment | PARTIAL | see H | |
 | Succession planning | VERIFIED | `unit/test_workforce.py::test_succession_finds_successors_and_single_points_of_failure` | |
 
@@ -299,16 +299,22 @@ about what AgentOS *records and enforces*, not about decision quality, which sli
 
 ## AA: Self-improvement effectiveness
 
-All five (improvement over baseline, candidate validation, regression detection, reproducibility,
-learning transfer): **LATER (slice 3)**. Nothing in slice 1 measures improvement.
+| Criterion | Status | Evidence | Notes |
+| --- | --- | --- | --- |
+| Improvement over baseline | VERIFIED (mechanism) | promotion needs a representative gain of 2 points with more wins than losses and no held-out loss: `unit/test_improve.py::test_a_better_challenger_is_promoted_into_the_champion`, `::test_a_weaker_challenger_is_rejected_and_remembered` | no real improvement has been measured yet; that needs real work graded over time |
+| Candidate validation | VERIFIED | isolated candidate, safety re-check, gate: `::test_the_challenger_is_an_isolated_candidate`, `::test_a_failing_gate_blocks_promotion`, `::test_unsafe_or_identical_challengers_are_refused` | |
+| Regression detection | VERIFIED | `::test_a_regression_after_promotion_is_rolled_back`, `::test_a_holding_improvement_is_adopted` | 5-grade window, 5-point margin: uncalibrated |
+| Reproducibility | PARTIAL | cases are content-hashed, fixed before the experiment and run by AgentOS; every step is audited | host workers are not deterministic |
+| Learning transfer | PARTIAL | promotions write validated organization-wide memory | reuse is not measured |
 
 ## AB: Controlled self-evolution
 
 | Criterion | Status | Evidence | Notes |
 | --- | --- | --- | --- |
-| Experiment isolation | LATER (slice 3) | none | |
-| Versioned proposals | PARTIAL | templates are versioned (see V) | no proposal workflow |
-| Staged promotion | LATER (slice 3) | none | |
+| Experiment isolation | VERIFIED | a `candidate` template is never recruited and is admitted only on its own running experiment's trials: `unit/test_improve.py::test_the_challenger_is_an_isolated_candidate` | |
+| Versioned proposals | VERIFIED | experiments record champion version and challenger; promotion adds a version, rollback re-adds the previous one: `::test_a_regression_after_promotion_is_rolled_back` | |
+| Staged promotion | VERIFIED | trialing, then promoted, then adopted or rolled back: `::test_a_holding_improvement_is_adopted` | |
+| No unauthorized self-modification | VERIFIED | only instructions, description and hints, and bounded recruitment weights, are tunable: `::test_experiments_cannot_touch_permissions_or_security`, `unit/test_policy.py::test_sensitive_or_unknown_names_are_not_tunable`; hand replacement needs the owner: `integration/test_cli_improve.py::test_replacing_a_working_template_needs_the_owner` | |
 | Protected governance | VERIFIED | protected settings need the owner: `unit/test_governance.py::test_protected_setting_needs_owner` | |
 | Rollback | PARTIAL | see V | |
 
@@ -339,7 +345,7 @@ learning transfer): **LATER (slice 3)**. Nothing in slice 1 measures improvement
 | Code quality | VERIFIED | `ruff check src tests` clean | |
 | Dependency management | VERIFIED | one runtime dependency | |
 | Documentation | PARTIAL | see A | |
-| Testability | VERIFIED | 94% branch coverage | |
+| Testability | VERIFIED | 95% branch coverage | |
 | Technical debt | PARTIAL | see `docs/LIMITATIONS.md` | |
 
 ## AF: User experience
@@ -366,7 +372,7 @@ learning transfer): **LATER (slice 3)**. Nothing in slice 1 measures improvement
 
 | Criterion | Status | Evidence | Notes |
 | --- | --- | --- | --- |
-| Benchmark protection | LATER (slice 3) | none | |
+| Benchmark protection | VERIFIED | held-out cases hidden, leakage refused, late cases excluded, used held-out cases demoted: `unit/test_improve.py::test_held_out_cases_are_hidden_from_listings_and_the_audit`, `::test_a_challenger_that_copies_a_held_out_case_is_refused`, `::test_cases_added_after_the_experiment_do_not_count`, `::test_used_held_out_cases_no_longer_count_as_held_out` | leakage check is textual |
 | Reviewer independence | VERIFIED | see Q | |
 | Score calibration | NOT BUILT | weights are uncalibrated and labeled so | |
 | Evidence traceability | VERIFIED | evidence stored with each evaluation and audited | |
@@ -563,3 +569,33 @@ admission; nothing starts or kills a native worker.
 | Knowledge and audit preserved | VERIFIED | `::test_terminate_failed_worker_records_a_failure_lesson`; suspension, not deletion, on expiry; `audit verify` in `integration/test_cli_workforce.py::test_factory_fills_a_gap_and_recruits` | |
 | Owner approval where governance requires it | VERIFIED | factory widening needs `factory_register`; retiring and quarantine release stay owner-only: `::test_rehabilitation_input_checks` | |
 | Native platform constraints respected | VERIFIED (by design) | no code path starts or stops a native worker; admission and the runtime hooks stay the gate | not run in a live host session |
+
+## V4.0 Phase 5: Self-improvement engine
+
+See [docs/IMPROVE.md](../docs/IMPROVE.md). AgentOS never calls a model: hypotheses are
+rule-based or the host's, and what is enforced is how a change earns promotion. Paid spend
+stays zero; trials are ordinary admissions under the same limits and budgets.
+
+| Requirement | Status | Evidence | Open |
+| --- | --- | --- | --- |
+| 1. Collect outcomes, measurements, evidence | VERIFIED | `unit/test_improve.py::test_accepting_a_task_runs_a_retrospective` (run by `boss accept` and `boss deliver`) | |
+| 2. Successful and unsuccessful strategies | VERIFIED | same test (`successful` entry); thresholds 85 and 70 | hand-picked |
+| 3. Recurring weaknesses | VERIFIED | `::test_retro_diagnoses_weaknesses_and_proposes_a_testable_change`, `::test_recurring_capability_mismatches_suggest_a_recruitment_policy` | |
+| 4. Improvement hypotheses | VERIFIED (rule-based) | same tests | not model-written |
+| 5. Improved prompts, configurations, skills, workflows | VERIFIED | `improve propose --template/--policy/--from-retro`: `integration/test_cli_improve.py::test_a_template_experiment_runs_to_promotion` | skills improve via validated memory, not by editing SKILL.md |
+| 6. Isolated candidate versions | VERIFIED | `::test_the_challenger_is_an_isolated_candidate` | |
+| 7. Evaluate against the baseline | VERIFIED | `::test_a_better_challenger_is_promoted_into_the_champion`, `::test_trials_are_blind_and_each_arm_runs_a_case_once` | |
+| 8. Representative and held-out cases | VERIFIED | `::test_an_experiment_needs_enough_cases`, `::test_a_weaker_challenger_is_rejected_and_remembered` (held-out loss rejects) | 3 + 2 cases is a small sample |
+| 9. Security and regression tests | VERIFIED | `::test_a_failing_gate_blocks_promotion`; challenger re-validated at decision | the gate runs whatever command the host names |
+| 10. Independent evaluation | VERIFIED | `::test_grades_must_be_independent_and_cite_the_case_evidence`; two evaluators required: `::test_decide_refuses_while_the_evidence_is_incomplete` | evaluator identity unauthenticated |
+| 11. Promote validated improvements | VERIFIED | `::test_a_better_challenger_is_promoted_into_the_champion`, `::test_a_better_policy_is_promoted_then_monitored` | |
+| 12. Reject ineffective changes | VERIFIED | `::test_a_weaker_challenger_is_rejected_and_remembered`, `::test_a_flagged_trial_blocks_promotion`, `::test_an_abandoned_trial_counts_as_a_failure` | |
+| 13. Monitor subsequent performance | VERIFIED | `::test_a_holding_improvement_is_adopted`, `::test_a_champion_changed_by_hand_supersedes_the_monitor` | |
+| 14. Roll back regressions | VERIFIED | `::test_a_regression_after_promotion_is_rolled_back`, `::test_a_better_policy_is_promoted_then_monitored` | |
+| 15. Preserve validated learning | VERIFIED | promoted: validated org procedural memory; rejected and rolled back: failure memory (same tests) | |
+| Champion versus challenger | VERIFIED | all of the above | |
+| No evaluation manipulation | VERIFIED | grades must cite the case's AgentOS-run evidence, come from neither arm's template, and abandoned trials count as failures | |
+| No benchmark leakage | VERIFIED | `::test_held_out_cases_are_hidden_from_listings_and_the_audit`, `::test_a_challenger_that_copies_a_held_out_case_is_refused`, `::test_used_held_out_cases_no_longer_count_as_held_out`, `::test_cases_added_after_the_experiment_do_not_count` | textual check; paraphrases pass |
+| No unauthorized self-modification | VERIFIED | `::test_experiments_cannot_touch_permissions_or_security`, `unit/test_policy.py::test_sensitive_or_unknown_names_are_not_tunable`, `::test_values_must_stay_within_bounds`, `integration/test_cli_improve.py::test_replacing_a_working_template_needs_the_owner` | |
+| May improve recruitment, staffing, planning, skills, context, non-sensitive architecture | PARTIAL | recruitment weights (`unit/test_policy.py::test_recruitment_ranks_with_the_stored_and_overridden_weights`); staffing, planning and context through lead/planner instructions; skills through memory | no architectural component other than recruitment weights is tunable yet |
+| Never ownership, security boundaries, approvals, hard limits | VERIFIED (by design) | none of them is in `policy.REGISTRY` or the tunable template fields; refused as `not_tunable` | |

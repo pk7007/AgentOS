@@ -19,11 +19,20 @@ class Candidate(BaseModel):
     reasons: list[str]
 
 
+def _weights(conn: sqlite3.Connection, overrides: dict | None = None) -> dict[str, float]:
+    """The ranking weights: the defaults, unless a validated experiment promoted other values."""
+    from agentos import policy
+
+    return {k: policy.get(conn, f"recruit.w_{k}", overrides)
+            for k in ("match", "history", "reliability", "confidence")}
+
+
 def rank(conn: sqlite3.Connection, required: list[str], category: str | None = None,
-         high_risk: bool = False) -> list[Candidate]:
+         high_risk: bool = False, weights: dict | None = None) -> list[Candidate]:
     req = {c.strip().lower() for c in required if c.strip()}
     if not req:
         return []
+    w = _weights(conn, weights)
     out = []
     for t in templates.list_templates(conn, TemplateStatus.active):
         caps = {c.lower() for c in t.capabilities}
@@ -35,7 +44,8 @@ def rank(conn: sqlite3.Connection, required: list[str], category: str | None = N
             continue
         history = (s.mean / 100) if s.n else 0.5
         reliability = (1 - s.failure_rate) if s.n else 0.5
-        score = 0.45 * match + 0.25 * history + 0.15 * reliability + 0.15 * s.confidence
+        score = (w["match"] * match + w["history"] * history + w["reliability"] * reliability
+                 + w["confidence"] * s.confidence)
         reasons = [f"match {match:.0%}", f"evaluations {s.n}"]
         if s.n:
             reasons.append(f"mean {s.mean:.1f}")

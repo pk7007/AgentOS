@@ -315,6 +315,20 @@ worker safely and saves what it learned, and `transfer` hands unfinished work to
 with a briefing. Retiring a template stays with the owner. Details:
 [docs/WORKFORCE.md](docs/WORKFORCE.md).
 
+### Self-improvement
+
+After each accepted task and delivered objective, a retrospective collects the outcomes, grades
+and evidence, separates what worked from what didn't, diagnoses recurring weaknesses and proposes
+hypotheses (an instruction change for a template, or a recruitment weight). A change replaces
+nothing until it wins a **champion-versus-challenger experiment**: the challenger runs as an
+isolated candidate on fixed representative and held-out benchmark cases, every trial is checked by
+AgentOS running the case's own command and graded by an evaluator of neither side, a regression
+and security gate must pass, and only a clear, unflagged win with no loss on held-out cases is
+promoted. Promoted changes are monitored and rolled back if they regress; what was learned is
+kept as validated memory. Only instructions, descriptions, model and reasoning hints and bounded
+recruitment weights can change this way; permissions, security, approvals, limits and ownership
+cannot. Details: [docs/IMPROVE.md](docs/IMPROVE.md).
+
 ### Emergency stop
 
 `agentos stop` is a big red button anyone can press: no new workers are admitted, and running
@@ -336,7 +350,8 @@ not initialized, `3` refused by policy, `4` not found, `5` integrity failure.
 | Agent Factory | `factory recruit --task --host [--parent] [--permanent]`, `factory propose --cap CAP [--task] [--file SPEC.toml] [--permanent] [--ttl-hours]`, `factory register / show ID`, `factory reject ID --reason`, `factory expire`, `factory list [--status]` |
 | Workforce | `workforce review`, `workforce rehab TEMPLATE --file V2.toml`, `workforce probation TEMPLATE`, `workforce succession`, `workforce split TASK [--parts N]`, `workforce contract`, `workforce terminate ID --reason [--note]`, `workforce transfer ID --host [--to TEMPLATE] [--note]`, `workforce transfers` |
 | Objectives (Boss) | `boss start TITLE --accept CRITERION [--statement] [8 complexity flags]`, `boss plan OBJ --file PLAN.json`, `boss next / bottlenecks / review / show OBJ`, `boss accept TASK --eval EV_ID [--min-score]`, `boss recover TASK`, `boss deliver OBJ --criterion N=EVD_ID`, `boss list` |
-| Templates | `template add FILE`, `template seed`, `template list`, `template inspect ID`, `template suspend / quarantine / retire / reinstate ID --reason` |
+| Self-improvement | `improve retro [--task / --objective / --show ID]`, `improve case --suite --title --split [--cap] -- COMMAND...`, `improve cases`, `improve propose --suite (--from-retro ID / --template ID --file F / --policy NAME --value N)`, `improve trial EXP CASE --arm --host`, `improve check TRIAL`, `improve score TRIAL EVAL`, `improve gate EXP -- COMMAND...`, `improve status / decide / show EXP`, `improve abandon EXP --reason`, `improve monitor`, `improve experiments`, `improve policies` |
+| Templates | `template add FILE` (an existing id needs the owner), `template seed`, `template list`, `template inspect ID`, `template suspend / quarantine / retire / reinstate ID --reason` |
 | Agents | `agent admit --task --template [--parent] [--host]`, `agent transition ID STATE [--confirmed]`, `agent confirm-stop ID`, `agent list [--active]`, `agent inspect ID` |
 | Evidence | `evidence run [--timeout S] -- COMMAND...`, `evidence show ID` |
 | Evaluations | `eval record ID --evaluator INSTANCE --category --score <key>=N (all 8) --evidence EVD_ID`, `perf show TEMPLATE`, `recruit --cap CAP [--high-risk]` |
@@ -390,6 +405,8 @@ asks for the PIN, unechoed. It is stored only as a salted scrypt hash and never 
 - raising any limit
 - setting a `usd` budget above `max_paid_spend_usd`
 - retiring a template, or releasing one from quarantine
+- replacing a working template by hand (`template add` with an id that exists); otherwise changes
+  go through an `improve` experiment
 - granting an approval
 - lifting the emergency stop
 - restoring the database from a backup

@@ -79,7 +79,15 @@ def standing_reasons(conn: sqlite3.Connection, project_id: str, task_id: str, te
             reasons.append("dependencies_incomplete")
     try:
         tpl = get_template(conn, template_id)
-        if tpl.status != TemplateStatus.active:
+        if tpl.status == TemplateStatus.candidate:
+            # A challenger works only on its own experiment's trial tasks, while that experiment runs.
+            on_trial = conn.execute(
+                "SELECT 1 FROM trials t JOIN experiments e ON e.id=t.experiment_id WHERE t.task_id=?"
+                " AND e.status='trialing' AND e.challenger_template=? AND t.template_id=?",
+                (task_id, template_id, template_id)).fetchone()
+            if not on_trial:
+                reasons.append("template_unavailable")
+        elif tpl.status != TemplateStatus.active:
             reasons.append("template_unavailable")
     except NotFound:
         tpl = None

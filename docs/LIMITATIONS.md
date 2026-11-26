@@ -64,6 +64,21 @@ not that it is good at the work: only the evaluations that follow show that. The
 thresholds (3 failures in a row, probation at 3 and 6 evaluations, 72-hour expiry, 5 live
 specialists) are hand-picked and uncalibrated.
 
+## Self-improvement is measured, not intelligent
+
+`agentos improve` does not invent better prompts; its hypotheses are fixed addenda chosen from
+which sub-score is weak, plus one recruitment-weight rule, and the host can propose its own.
+What it guarantees is the process: isolated candidates, fixed cases, independent grades backed by
+AgentOS-run checks, a passing gate and a margin before anything is promoted, then monitoring and
+rollback. It cannot guarantee the grades themselves are good (see "Evaluator identity is not
+authenticated"), and a benchmark of five cases is a small sample: the 2-point margin, the 5-grade
+monitor and the 5-point rollback threshold are hand-picked and uncalibrated. Leakage detection is
+textual (shared 6-word runs or the case title), so a paraphrase of a held-out case is not caught.
+Staffing, planning and context handling improve only insofar as they are written in template
+instructions; skills improve through validated memory, not by editing the skill file. Paid spend
+stays zero: trials are ordinary admissions and use the same budgets. Details:
+[IMPROVE.md](IMPROVE.md).
+
 ## Termination may be unconfirmed
 
 AgentOS cannot stop a host's native worker process. Moving an instance to CANCELLED or
@@ -118,6 +133,6 @@ CI (`.github/workflows/ci.yml`) runs lint and the test suite on Windows and Ubun
 
 ## Not in slice 1
 
-Self-improvement experiments, champion/challenger promotion and benchmarks (slice 3); model
-routing and predictive staffing (slice 4); a dashboard; any
+Model routing and predictive staffing (slice 4); calibrating the hand-picked thresholds against
+real outcomes; a dashboard; any
 background service. See `reports/AUDIT.md` for the criterion-by-criterion picture.
