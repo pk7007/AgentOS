@@ -29,7 +29,7 @@ def _concrete(cmd: str) -> list[str]:
     cmd = re.sub(r"\[([^\]]+)\]", r"\1", cmd)          # optional parts are filled in
     cmd = re.sub(r"<[^>]+>", "x", cmd)                   # placeholders
     cmd = re.sub(r"\b0-5\b", "1", cmd)
-    cmd = re.sub(r"--(tasks|depth|workstreams|files) [NDWF]\b", r"--\1 1", cmd)
+    cmd = re.sub(r"--(tasks|depth|workstreams|files|tokens) [NDWF]\b", r"--\1 1", cmd)
     cmd = re.sub(r"(\w+)\|\w+(\|\w+)*", r"\1", cmd)       # start|done|fail -> start
     cmd = cmd.replace("...", "y")
     return shlex.split(cmd)[1:]

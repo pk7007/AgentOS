@@ -14,13 +14,16 @@ enforcement. Hooks that block host actions until AgentOS says yes are planned fo
 Owner-only actions (raising limits, a paid budget above zero, retiring templates, restore,
 lifting the emergency stop) ask for `I APPROVE <action>` to be typed at a real interactive
 console. Agents run without one, so they cannot answer. But anyone, or any program, that can
-type into a real console on this machine as this user can confirm. AgentOS has no passwords or
-second factor. Protect the machine and user account.
+type into a real console on this machine as this user can type the phrase, which the prompt
+shows. Set an owner PIN (`agentos owner pin set`) so a confirmation also needs a secret the
+prompt never shows. Anything that can write the database file directly is outside this
+protection. Protect the machine and user account.
 
 ## Usage numbers are estimates
 
 AgentOS cannot see a host's real token counts or bills. Budgets count what the host *reports*
-(`tokens_est`, `agent_runs`). They are labeled estimates everywhere. Paid spend is capped at $0
+(`agent_runs` at admission, `tokens_est` and `usd` through `agentos budget use`). A host that
+never reports usage is never charged. They are labeled estimates everywhere. Paid spend is capped at $0
 by default because AgentOS itself never makes paid calls.
 
 ## Heuristics are uncalibrated
@@ -31,15 +34,29 @@ would calibrate them are planned for slice 3. Treat their output as a starting p
 
 ## Termination may be unconfirmed
 
-AgentOS cannot stop a host's native worker process. Moving an instance to TERMINATED records
-the intent. Unless the host confirms the worker really stopped (`--confirmed`), the instance is
-shown as `TERMINATED (unconfirmed)`.
+AgentOS cannot stop a host's native worker process. Moving an instance to CANCELLED or
+TERMINATED records the intent. Until the host confirms the worker really stopped
+(`agent confirm-stop`, or `--confirmed`), the instance keeps its concurrency slot and shows as
+`TERMINATED (unconfirmed)`. If a host crashes without confirming, the owner or a later session
+must confirm the stop to free the slot.
 
 ## Secret redaction is pattern-based
 
-Memory, audit payloads and handovers are passed through redaction for common secret formats
-(private keys, `sk-` keys, GitHub and AWS tokens, Slack tokens, `password=`-style values).
-Secrets in other formats are not caught. Don't paste secrets into AgentOS.
+Memory, audit payloads, evidence output and handovers are passed through redaction for common
+secret formats (private keys, `sk-`, GitHub, GitLab, npm, AWS, Slack, Stripe and Google keys,
+JWTs, `Bearer` tokens, passwords in URLs, and `password` / `*_secret` / `*_key`-style values,
+including JSON). Secrets in other formats are not caught. Don't paste secrets into AgentOS.
+
+## Evidence proves what ran, not what it means
+
+`agentos evidence run` records the real exit code and output of a command AgentOS ran itself,
+so a result can't be invented. A host can still choose a command that proves nothing; the
+record shows the exact command, so reviewers should read it.
+
+## Evaluator identity is not authenticated
+
+An evaluator must be a registered agent instance of the same project, but AgentOS has no
+per-agent credentials, so a host that knows another instance's id can grade under it.
 
 ## Search is keyword search
 

@@ -76,7 +76,8 @@ def doctor_checks() -> tuple[list[dict], bool]:
 
 def _extra_checks(conn) -> list[dict]:
     chain = audit.verify_chain(conn)
-    detail = f"{chain.checked} events" if chain.ok else f"broken at event seq {chain.first_bad_seq}"
+    detail = (f"{chain.checked} events" if chain.ok
+              else f"broken at event seq {chain.first_bad_seq} ({chain.reason})")
     return [_check("audit_chain", "VERIFIED" if chain.ok else "UNSUPPORTED", detail)]
 
 

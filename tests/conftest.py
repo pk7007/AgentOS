@@ -99,3 +99,28 @@ def owner_tty(monkeypatch):
 
     monkeypatch.setattr(governance, "_default_isatty", lambda: True)
     monkeypatch.setattr(governance, "_default_prompt", lambda msg: "I APPROVE " + msg.split("'")[1])
+
+
+def add_instance(conn, project, task, template="reviewer", parent=None, state="RUNNING"):
+    """Register an agent instance directly (bypasses admission), e.g. as an evaluator."""
+    from agentos.util import new_id, now_iso
+
+    iid, ts = new_id("ag"), now_iso()
+    conn.execute(
+        "INSERT INTO agent_instances(id, template_id, template_version, project_id, task_id, parent_id, depth,"
+        " host, state, created_at, updated_at) VALUES (?, ?, 1, ?, ?, ?, 0, 'test', ?, ?, ?)",
+        (iid, template, project.id, task.id, parent, state, ts, ts))
+    return iid
+
+
+def add_evidence(conn, project_id, exit_code=0):
+    """An evidence row as `agentos evidence run` would write it (the runner has its own tests)."""
+    from agentos.util import new_id, now_iso
+
+    eid, ts = new_id("evd"), now_iso()
+    conn.execute(
+        "INSERT INTO evidence(id, project_id, command, cwd, exit_code, timed_out, stdout_sha256, stderr_sha256,"
+        " output_tail, git_head, started_at, finished_at, duration_ms, actor)"
+        " VALUES (?, ?, '[\"pytest\", \"-q\"]', '.', ?, 0, 'x', 'x', '3 passed', NULL, ?, ?, 1, 'test')",
+        (eid, project_id, exit_code, ts, ts))
+    return eid

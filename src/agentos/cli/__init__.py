@@ -14,14 +14,19 @@ from dataclasses import dataclass
 from agentos import __version__
 from agentos.errors import AgentOSError, PolicyDenied
 
-COMMAND_MODULES: tuple[str, ...] = ("cmd_system", "cmd_audit", "cmd_project", "cmd_task", "cmd_template", "cmd_agent", "cmd_budget", "cmd_governance", "cmd_perf", "cmd_memory", "cmd_handover", "cmd_gen")
+COMMAND_MODULES: tuple[str, ...] = ("cmd_system", "cmd_audit", "cmd_project", "cmd_task", "cmd_template", "cmd_agent", "cmd_budget", "cmd_governance", "cmd_perf", "cmd_memory", "cmd_handover", "cmd_gen", "cmd_evidence")
 
 
 def owner_guard(action: str, ctx):
     """Ask the human owner at a real terminal to confirm `action`. Raises PolicyDenied otherwise."""
-    from agentos import governance
+    from agentos import db, governance, paths
 
-    return governance.confirm_owner(action)
+    conn = db.connect() if paths.db_path().exists() else None
+    try:
+        return governance.confirm_owner(action, conn=conn)
+    finally:
+        if conn is not None:
+            conn.close()
 
 
 def add_project_arg(parser) -> None:
@@ -37,6 +42,18 @@ def resolve_project(conn, target: str | None):
     if target and target.startswith("prj_"):
         return projects.get_project(conn, target)
     return projects.get_project(conn, projects.project_id_for(Path(target) if target else Path.cwd()))
+
+
+def require_project(conn, args, owner_project_id: str, what: str):
+    """Commands that act on one record by id may only touch records of the current project
+    (cwd or --project). Returns the current project."""
+    from agentos.errors import PolicyDenied
+
+    current = resolve_project(conn, getattr(args, "project", None))
+    if current.id != owner_project_id:
+        raise PolicyDenied(f"{what} belongs to another project; run from its repository or pass --project",
+                           reasons=["cross_project"])
+    return current
 
 
 @dataclass

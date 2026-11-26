@@ -36,16 +36,21 @@ If `status` reports an emergency stop, do not start agents. Tell the user.
 4. **Ask before every spawn.**
    `agentos agent admit --task <task> --template <id> [--parent <your instance>] --host <host> --json`
    Exit 0 gives you an instance id. Exit 3 means **do not start the worker**: read `reasons`
-   (for example `max_concurrent`, `max_depth`, `budget_exceeded:*`, `emergency_stop`) and either
-   wait, do the work yourself, or report back.
+   (for example `max_concurrent`, `dependencies_incomplete`, `capability_mismatch`,
+   `high_risk_unproven`, `budget_exceeded:*`, `emergency_stop`) and either wait, do the work
+   yourself, or report back. Never switch templates just to get past a reason.
 5. **Track state.** Move the instance as it works:
    `agentos agent transition <instance> RUNNING` ... `REVIEWING` ... `COMPLETED` or `FAILED`
-   (add `--reason`). Leaving the active states frees its slot. `agentos task start|done|fail <task>`.
-6. **Grade with evidence.** A different agent, never the worker itself, its parent or its child:
-   `agentos eval record <instance> --evaluator <id> --category coding --score quality=90 --score accuracy=85 --evidence "pytest -q: 41 passed"`
-   Score keys (0-100): quality, accuracy, reliability, instruction_compliance, security_compliance,
-   cost_efficiency, speed, collaboration. No evidence, no grade. Use `--flag security_violation`
-   only for real violations.
+   (add `--reason`). `agentos task start|done|fail <task>`.
+   To stop a worker: `agentos agent transition <instance> CANCELLED`, stop it in your runtime,
+   then `agentos agent confirm-stop <instance>`. Until you confirm, it keeps its slot.
+   Before a costly step, charge it: `agentos budget use <instance> --tokens N`; exit 3 means skip it.
+6. **Grade with evidence.** First let AgentOS run the check itself:
+   `agentos evidence run -- pytest -q` gives an `evd_` id with the real exit code.
+   Then a different agent instance of this project (never the worker itself, its parent or its
+   child) grades it, giving **every** score (0-100) and at least one `evd_` id:
+   `agentos eval record <instance> --evaluator <reviewer instance> --category coding --score quality=90 --score accuracy=85 --score reliability=85 --score instruction_compliance=90 --score security_compliance=90 --score cost_efficiency=80 --score speed=80 --score collaboration=85 --evidence <evd id>`
+   One grade per evaluator and category. Use `--flag security_violation` only for real violations.
 7. **Save what was learned.**
    `agentos memory add project "decision and why" --source <file or PR>`
    `agentos memory search "<words>" --json` before re-solving something.
@@ -67,7 +72,7 @@ Resume can be claimed once. Read its `warnings` (`head_advanced`, `head_diverged
 ## Things only the human owner can do
 
 Raising limits, setting a paid budget above zero, retiring templates, restore, lifting an
-emergency stop. These ask the owner to type a confirmation at a real terminal. You cannot do
+emergency stop, granting approvals (including `admit_high_risk` for high-risk tasks). These ask the owner to type a confirmation at a real terminal. You cannot do
 them, and you must not try to work around them. Ask the user.
 
 ## Rules

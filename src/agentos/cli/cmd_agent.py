@@ -1,4 +1,4 @@
-"""agent admit | transition | list | inspect (live instances, not templates)."""
+"""agent admit | transition | confirm-stop | list | inspect (live instances, not templates)."""
 
 from agentos import db, lifecycle
 from agentos.lifecycle import AgentState
@@ -14,7 +14,13 @@ def register(sub, common) -> None:
     t.add_argument("state", type=str.upper, choices=[x.value for x in AgentState])
     t.add_argument("--reason", default=None)
     t.add_argument("--confirmed", action="store_true", help="the host confirmed the runtime worker stopped")
+    add_project_arg(t)
     t.set_defaults(func=cmd_transition)
+    cs = s.add_parser("confirm-stop", parents=[common],
+                      help="the runtime worker is really gone: free the slot a CANCELLED/unconfirmed agent holds")
+    cs.add_argument("id")
+    add_project_arg(cs)
+    cs.set_defaults(func=cmd_confirm_stop)
     ls = s.add_parser("list", parents=[common], help="list instances")
     add_project_arg(ls)
     ls.add_argument("--all-projects", action="store_true")
@@ -22,6 +28,7 @@ def register(sub, common) -> None:
     ls.set_defaults(func=cmd_list)
     i = s.add_parser("inspect", parents=[common], help="show one instance")
     i.add_argument("id")
+    add_project_arg(i)
     i.set_defaults(func=cmd_inspect)
     _register_admit(s, common)
 
@@ -61,9 +68,18 @@ def _view(inst):
     return d
 
 
+def _owned(conn, args):
+    from agentos.cli import require_project
+
+    inst = lifecycle.get_instance(conn, args.id)
+    require_project(conn, args, inst.project_id, f"agent {inst.id}")
+    return inst
+
+
 def cmd_transition(args, ctx):
     conn = db.require_initialized()
     try:
+        _owned(conn, args)
         confirmed = True if args.confirmed else (False if args.state == "TERMINATED" else None)
         return _view(lifecycle.transition(conn, args.id, AgentState(args.state), ctx.actor, args.reason,
                                           runtime_confirmed=confirmed))
@@ -84,9 +100,18 @@ def cmd_list(args, ctx):
         conn.close()
 
 
+def cmd_confirm_stop(args, ctx):
+    conn = db.require_initialized()
+    try:
+        _owned(conn, args)
+        return _view(lifecycle.confirm_stopped(conn, args.id, ctx.actor))
+    finally:
+        conn.close()
+
+
 def cmd_inspect(args, ctx):
     conn = db.require_initialized()
     try:
-        return _view(lifecycle.get_instance(conn, args.id))
+        return _view(_owned(conn, args))
     finally:
         conn.close()

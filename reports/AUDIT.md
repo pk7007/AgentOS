@@ -17,9 +17,10 @@ Criterion register over the source spec's audit domains A to AO, for version 0.1
 which criterion Z forbids. The spec's 9/10 target is therefore **not claimed** for this slice.
 A row is VERIFIED only when a test or recorded command shows it.
 
-Evidence paths are relative to `tests/`. Test run at time of writing: `python -m pytest -q`
-gives **303 passed** (the live test is excluded by default). Branch coverage is 94% overall:
-admission 96%, audit 100%, governance 97%, governor 99%, lifecycle 95%. `ruff check src tests` is clean.
+Evidence paths are relative to `tests/`. Test run at time of writing (after the V4.0 Phase 1
+defect fixes): `python -m pytest -q` gives **381 passed** (the live test is excluded by default).
+Branch coverage is 94% overall: admission 96%, audit 97%, evidence 95%, governance 97%, governor 96%, lifecycle 97%, performance 95%, redact 100%. `ruff check src tests` is clean. A fresh clone of the pre-fix commit `1b7d492` gave
+303 passed and a clean ruff run, which is the Phase 0 baseline.
 
 ### Host role
 
@@ -121,7 +122,7 @@ about what AgentOS *records and enforces*, not about decision quality, which sli
 | Decision quality | NOT BUILT | none | host's job; not measurable here |
 | Context understanding | NOT BUILT | none | host's job |
 | Capability matching | VERIFIED | see D: candidate selection | |
-| Evidence synthesis | PARTIAL | evaluations require evidence: `unit/test_performance.py::test_no_evidence_rejected` | |
+| Evidence synthesis | PARTIAL | evaluations require an `evd_` record AgentOS ran itself: `security/test_phase1_defects.py::test_d06_free_text_evidence_alone_is_rejected`, `unit/test_phase1_features.py::test_evidence_records_what_really_happened` | the host still chooses which command proves what |
 | Organizational effectiveness | LATER (slice 3) | none | needs benchmarks |
 
 ## J: Job orchestration
@@ -291,7 +292,7 @@ about what AgentOS *records and enforces*, not about decision quality, which sli
 | Criterion | Status | Evidence | Notes |
 | --- | --- | --- | --- |
 | No fabricated agents | VERIFIED | recruit reports a gap instead of inventing a template: `unit/test_recruit.py::test_gap_reported` | |
-| No fabricated test results | PARTIAL | evaluations need evidence (`unit/test_performance.py::test_no_evidence_rejected`) | AgentOS cannot check that evidence is true |
+| No fabricated test results | PARTIAL | every evaluation cites at least one `evd_` record holding the real exit code and output hashes of a command AgentOS ran: `security/test_phase1_defects.py::test_d06_*`, `unit/test_performance.py::test_evidence_must_exist_and_belong_to_the_project` | a host can still run a command that proves nothing (for example `python -c "print('passed')"`); the record shows exactly what ran, so a reviewer can see it |
 | No fabricated costs | VERIFIED | usage is labeled "estimates only" (handover `usage_note`); no cost is computed | |
 | No fabricated performance | VERIFIED | under 5 evaluations gives `insufficient_evidence`: `unit/test_performance.py::test_insufficient_evidence_under_5`, `::test_empty_summary` | |
 | No fabricated quality scores | VERIFIED | this report gives no numeric scores (see top) | |
@@ -449,3 +450,44 @@ Each was found by a test or a live run. Each fix went test-first (RED, then GREE
 - `memory inspect` read any project's records by id. It now refuses other projects' records except shared ones. (`security/test_memory_inspect_isolation.py`)
 - The skill told hosts to use score keys that don't exist, so every evaluation would have failed. (`unit/test_skill_commands.py::test_skill_score_keys_are_real`)
 - TOML files with a UTF-8 BOM (written by Notepad and Windows PowerShell 5.1) crashed with a traceback. (`unit/test_gen.py::test_host_profile_with_bom_is_accepted`)
+
+---
+
+## V4.0 Phase 1: suspected-defect register
+
+The V4.0 recovery brief listed 17 suspected defects. Each one was reproduced with a test that
+asserts the correct behaviour (`security/test_phase1_defects.py`) and run against the unfixed code
+(commit `1b7d492`) before anything changed. **Confirmed** means that test failed for the stated
+reason on the unfixed code. D05 and D07 were first run with a test helper that didn't exist yet,
+so they were re-confirmed with a standalone script against the unfixed code: a made-up evaluator,
+an evaluator from another project, a second grade from the same evaluator and a `speed=100`-only
+grade (weighted 100.0) were all accepted. All fixes went test-first; the same tests pass now.
+
+| # | Suspected defect | Before fix | Fix | Evidence now |
+| --- | --- | --- | --- | --- |
+| D01 | Cooperative-only admission | **Confirmed, architectural**: nothing stops a host that never calls `agent admit` | not fixable in the ledger; needs host hooks (Phase 2) | LIMITATIONS.md |
+| D02 | Missing runtime cancellation | **Confirmed, architectural**: AgentOS has no handle on a host's worker process | slot now held until the host confirms the stop (D03); real cancellation needs runtime adapters (Phase 2) | LIMITATIONS.md |
+| D03 | Premature release of active-worker slots | **Confirmed**: CANCELLED, and TERMINATED without confirmation, freed the slot at once | `lifecycle.slot_count` counts them until `agent confirm-stop` or `TERMINATED --confirmed`; archiving them needs confirmation | `test_d03_*`, `unit/test_phase1_features.py::test_confirm_stopped_paths` |
+| D04 | Lifecycle transitions bypassing admission | **Confirmed**: FAILED to ASSIGNED ignored `max_concurrent` and the emergency stop | entering an active state runs admission's `standing_reasons` and reserves another agent run | `test_d04_*`, `::test_reentry_reserves_a_run_and_respects_budget` |
+| D05 | Unauthenticated evaluator identities | **Confirmed**: any string, and instances of other projects, were accepted | evaluator must be a registered instance of the same project, or `owner` with owner confirmation | `test_d05_*`, `unit/test_performance.py::test_owner_may_grade_only_with_confirmation` |
+| D06 | Fabricated or unverifiable evidence | **Confirmed**: free text such as "999 passed (trust me)" was accepted | `agentos evidence run` executes the command and records exit code, output hashes, redacted tail and Git HEAD; a grade needs one such `evd_` record of the same project, newer than the graded agent | `test_d06_*`, `::test_evidence_*` |
+| D07 | Duplicate or selectively incomplete evaluations | **Confirmed**: repeat grades and partial score sets were accepted | one grade per (agent, evaluator, category), checked inside the write transaction; all 8 scores required | `test_d07_*`, `unit/test_performance.py::test_every_score_is_required` |
+| D08 | Cross-project parent delegation | **Confirmed** | `parent_cross_project` | `test_d08_*` |
+| D09 | Missing dependency checks in admission | **Confirmed** | `dependencies_incomplete` | `test_d09_*` |
+| D10 | Missing capability and risk validation | **Confirmed** | `capability_mismatch`; `high` risk needs 3+ evaluations averaging 85+ or a one-use owner approval; `critical` always needs the approval | `test_d10_*`, `::test_high_risk_*`, `::test_critical_risk_*`, `::test_denied_admission_does_not_consume_the_approval` |
+| D11 | Race in task dependency creation | **Confirmed**: a forced interleaving created A->B and B->A | cycle check and insert share one `BEGIN IMMEDIATE` transaction | `test_d11_*` |
+| D12 | Insufficient reservation validation | **Confirmed**: negative and zero amounts were stored (a negative one refunded a budget); NaN crashed with a raw SQLite error | kind, scope and amount (finite, above 0) validated; `budget set` validated too | `test_d12_*`, `::test_set_budget_validation` |
+| D13 | Budget enforcement gaps | **Confirmed**: nothing ever charged `tokens_est` or `usd`, so those budgets could not be exceeded | `budget use` charges before spending (exit 3 if over); admission refuses once a token or paid budget is used up | `test_d13_*`, `::test_usage_validation_and_usd_cap`, `::test_budget_use_cli` |
+| D14 | Audit-chain truncation | **Confirmed**: deleting the newest events left `audit verify` passing | verify checks sequence gaps and the AUTOINCREMENT counter; `audit anchor` / `verify --anchor` catches a rewrite of the whole chain | `test_d14_*`, `::test_anchor_*`, `::test_truncation_reason_reported` |
+| D15 | Weak owner identity | **Confirmed**: the typed phrase, which the prompt itself prints, was the only factor | optional owner PIN (scrypt, asked unechoed, never logged) on every owner confirmation | `test_d15_*`, `::test_owner_pin_cli`, `::test_pin_must_be_long_enough_and_needs_owner` |
+| D16 | Secret-redaction limits | **Confirmed** for 9 formats: JWT, Bearer, Google, Stripe live/restricted, URL passwords, JSON `"password":`, `client_secret=`, `AWS_SECRET_ACCESS_KEY=` | patterns added; ordinary words such as `tokens_est` and `secretary` stay untouched | `test_d16_*`, `::test_redaction_leaves_ordinary_text` |
+| D17 | Incomplete project isolation | **Confirmed**: `agent transition / inspect` and `task start / inspect` acted on another project's records | commands acting on one record by id check it belongs to the current project (`cross_project`, exit 3); also `task dep`, `eval record`, `budget use`, `evidence show` | `test_d17_*` |
+
+### What these fixes do not change
+
+- An agent that can write the SQLite file directly can still do anything; the chain is unkeyed,
+  so only an anchor kept outside the agent's reach proves the whole history (D14).
+- Evaluator identity is bound to a registered instance, not authenticated: a host that knows
+  another instance's id can still pass it (D05). Real authentication needs per-agent credentials
+  issued by the host runtime (Phase 2).
+- D01 and D02 stay open until runtime adapters exist.

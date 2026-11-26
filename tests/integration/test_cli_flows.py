@@ -4,12 +4,15 @@ import json
 
 import pytest
 
+from agentos.performance import WEIGHTS
+
 
 @pytest.fixture
-def ready(cli, home, repo):
+def ready(cli, home, repo, monkeypatch):
     cli(["init"])
     cli(["template", "seed"])
     cli(["project", "activate", str(repo)])
+    monkeypatch.chdir(repo)  # like a host: commands run from inside the repository
     return repo
 
 
@@ -81,17 +84,30 @@ def test_agent_lifecycle_via_cli(cli, ready):
         "TERMINATED (unconfirmed)"
     assert _j(cli(["agent", "inspect", iid, "--json"]))["last_reason"] == "stuck"
     assert _j(cli(["agent", "list", "--project", str(ready), "--active", "--json"])) == []
+    assert cli(["agent", "transition", iid, "ARCHIVED"])[0] == 3  # stop not confirmed yet
+    assert _j(cli(["agent", "confirm-stop", iid, "--json"]))["state"] == "TERMINATED"
+    assert cli(["agent", "confirm-stop", iid])[0] == 3
+    assert _j(cli(["agent", "transition", iid, "ARCHIVED", "--json"]))["state"] == "ARCHIVED"
     assert cli(["agent", "inspect", "ag_000000000000"])[0] == 4
 
 
 def test_eval_perf_and_recruit(cli, ready):
     iid = _admit(cli, ready, _task(cli, ready))
-    e = _j(cli(["eval", "record", iid, "--evaluator", "reviewer-1", "--category", "coding",
-                "--score", "quality=90", "--score", "accuracy=80", "--evidence", "pytest -q: 3 passed", "--json"]))
-    assert e["instance_id"] == iid
+    reviewer = _admit(cli, ready, _task(cli, ready, "review"), "reviewer")
+    proof = _j(cli(["evidence", "run", "--json", "--", "python", "-c", "print('3 passed')"]))
+    assert proof["exit_code"] == 0 and "3 passed" in proof["output_tail"] and proof["id"].startswith("evd_")
+    assert _j(cli(["evidence", "show", proof["id"], "--json"]))["command"] == ["python", "-c", "print('3 passed')"]
+    scores = [x for k in WEIGHTS for x in ("--score", f"{k}=85")]
+    e = _j(cli(["eval", "record", iid, "--evaluator", reviewer, "--category", "coding", *scores,
+                "--evidence", proof["id"], "--json"]))
+    assert e["instance_id"] == iid and e["evaluator_id"] == reviewer
+    assert cli(["eval", "record", iid, "--evaluator", reviewer, "--category", "coding", *scores,
+                "--evidence", proof["id"]])[0] == 3  # one grade per evaluator and category
     assert cli(["eval", "record", iid, "--evaluator", "r", "--category", "coding", "--score", "x"])[0] == 2
     assert cli(["eval", "record", iid, "--evaluator", "r", "--category", "coding", "--score", "x=abc"])[0] == 2
-    assert cli(["eval", "record", iid, "--evaluator", iid, "--category", "coding", "--score", "x=1",
+    assert cli(["eval", "record", iid, "--evaluator", "made-up", "--category", "review", *scores,
+                "--evidence", proof["id"]])[0] == 3
+    assert cli(["eval", "record", iid, "--evaluator", iid, "--category", "coding", *scores,
                 "--evidence", "e"])[0] == 3
     p = _j(cli(["perf", "show", "implementer", "--json"]))
     assert p["n"] == 1 and p["recommendation"] == "insufficient_evidence"

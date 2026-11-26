@@ -50,7 +50,8 @@ sequenceDiagram
         A-->>H: exit 0 + instance id
         H->>H: start the worker
         H->>A: agent transition <id> RUNNING ... COMPLETED
-        H->>A: eval record <id> --evaluator reviewer --evidence ...
+        H->>A: evidence run -- pytest -q (AgentOS runs it and records the result)
+        H->>A: eval record <id> --evaluator <reviewer instance> --evidence evd_...
     else denied
         A-->>H: exit 3 + every reason (max_concurrent, budget_exceeded, ...)
         H->>H: do not start it; wait, do it itself, or report
@@ -60,7 +61,9 @@ sequenceDiagram
 ```
 
 Every change, allowed or denied, is appended to a hash-chained audit log. `agentos audit verify`
-recomputes the chain and fails (exit 5) if any row was edited or deleted.
+recomputes the chain and fails (exit 5) if any row was edited, deleted or cut off the end. To catch
+a rewrite of the *whole* chain, save `agentos audit anchor --out <file>` somewhere agents can't
+write and later run `agentos audit verify --anchor <file>`.
 
 ## Install
 
@@ -127,7 +130,8 @@ agentos task add "Add login rate limit" --cap testing --accept "tests pass" --js
 agentos recruit --cap review --json              # best template for a capability
 agentos agent admit --task <task id> --template implementer --host codex --json   # exit 3 = do not start it
 agentos agent transition <instance id> RUNNING
-agentos eval record <instance id> --evaluator reviewer-1 --category coding --score quality=90 --evidence "pytest -q: 41 passed"
+agentos evidence run -- pytest -q                # AgentOS runs it and records the real result: evd_...
+agentos eval record <instance id> --evaluator <reviewer instance id> --category coding --score quality=90 --score accuracy=85 --score reliability=85 --score instruction_compliance=90 --score security_compliance=90 --score cost_efficiency=80 --score speed=80 --score collaboration=85 --evidence <evd id>
 agentos memory add project "Rate limit lives in middleware, not handlers" --source docs/adr-7.md
 agentos handover create --objective "rate limiting" --next "wire the config flag" --host codex
 agentos audit verify
@@ -163,8 +167,11 @@ template on one task. Instances move through 17 states:
 
 Only legal moves are allowed (for example RUNNING to COMPLETED, but not RUNNING to ARCHIVED),
 and refused moves are audited. `ASSIGNED`, `RUNNING`, `WAITING`, `BLOCKED` and `REVIEWING`
-count as active and hold a concurrency slot. AgentOS can't kill a host's worker, so TERMINATED
-shows as `TERMINATED (unconfirmed)` unless the host passes `--confirmed`.
+count as active. AgentOS can't kill a host's worker, so a worker keeps its concurrency slot after
+`CANCELLED`, and after a `TERMINATED` the host didn't confirm (shown as `TERMINATED (unconfirmed)`),
+until the host confirms the runtime stopped: `agent confirm-stop <id>` or
+`agent transition <id> TERMINATED --confirmed`. Moving an agent back into active work (for example
+FAILED to ASSIGNED) goes through the same checks as a new admission and uses another agent run.
 
 ### Admission
 
@@ -175,23 +182,38 @@ shows as `TERMINATED (unconfirmed)` unless the host passes `--confirmed`.
 | `emergency_stop` | the owner or anyone engaged `agentos stop` |
 | `project_inactive` | the repo isn't activated |
 | `task_not_found`, `task_not_open` | the task doesn't exist or is finished |
+| `dependencies_incomplete` | a task this one depends on isn't done |
 | `template_unavailable` | the template is suspended, quarantined, retired or unknown |
+| `capability_mismatch` | the template lacks a capability the task requires (`--cap`) |
+| `high_risk_unproven` | `high` risk task: the template needs 3+ evaluations averaging 85+, or an owner approval |
+| `owner_approval_required` | `critical` risk task: always needs an owner approval |
 | `parent_not_active`, `parent_cannot_delegate` | the delegating agent isn't running or may not delegate |
+| `parent_cross_project` | the delegating agent belongs to another project |
 | `max_depth`, `max_concurrent`, `max_agents_per_task` | a limit would be exceeded |
 | `duplicate` | the same template is already active on this task |
 | `budget_exceeded:<scope>:<kind>` | a budget would be exceeded |
+| `budget_exhausted:<scope>:<kind>` | a token or paid-spend budget is already used up |
+
+For a high-risk or critical task, ask the owner:
+`agentos approval request admit_high_risk --params '{"task_id": "<task>", "template_id": "<template>"}'`.
+Once granted, the next matching admission uses it up.
 
 Admission is atomic: twelve processes racing for four slots get exactly four.
 
 ### Evaluations and performance
 
-An evaluation scores one agent instance from 0 to 100 on any of: `quality` (25%), `accuracy`
+An evaluation scores one agent instance from 0 to 100 on **all** of: `quality` (25%), `accuracy`
 (20%), `reliability` (15%), `instruction_compliance` (10%), `security_compliance` (10%),
-`cost_efficiency` (8%), `speed` (7%), `collaboration` (5%). Missing keys are left out and the
-weights renormalized.
+`cost_efficiency` (8%), `speed` (7%), `collaboration` (5%). Leaving a score out is refused, so a
+grade can't be built from only the flattering parts.
 
-- An agent can't be graded by itself, its parent or any ancestor, or its children or any descendant.
-- Every evaluation needs evidence: a test command and result, a file or a log.
+- The evaluator is another registered agent instance of the same project (or `owner`, which asks
+  for owner confirmation). It can't be the agent itself, its parent or any ancestor, or its
+  children or any descendant. Each evaluator grades an agent once per category.
+- Every evaluation needs at least one `evd_` evidence id from `agentos evidence run -- <command>`.
+  AgentOS runs that command itself in the repository and records the exact command, exit code,
+  output hashes, a redacted output tail and the Git HEAD, so the result can't be invented. Extra
+  free-text notes are allowed alongside it.
 - `--flag security_violation` or `integrity_violation` quarantines the template immediately.
 - `--external` marks a failure caused outside the agent's control; it doesn't count.
 
@@ -214,8 +236,10 @@ with full-text search. Layers: `working`, `episodic`, `semantic`, `procedural`, 
 - A record can be shared with all projects (`--org`) only if it is validated and in the
   `semantic`, `procedural`, `failure` or `organizational` layer.
 - `memory correct` creates a new version; `memory delete` wipes the content and keeps a tombstone.
-- Common secret formats (private keys, API keys, GitHub, AWS and Slack tokens, `password=` values)
-  are redacted before anything is stored.
+- Common secret formats are redacted before anything is stored: private keys, OpenAI-style,
+  GitHub, GitLab, npm, AWS, Slack, Stripe and Google keys, JWTs, `Bearer` tokens, passwords in URLs,
+  and values of keys such as `password`, `client_secret` or `AWS_SECRET_ACCESS_KEY`, including in
+  JSON. Redaction is pattern-based, so it can miss secrets in formats it doesn't know.
 
 ### Handovers
 
@@ -244,20 +268,22 @@ not initialized, `3` refused by policy, `4` not found, `5` integrity failure.
 | Group | Commands |
 | --- | --- |
 | System | `init`, `doctor`, `status`, `backup [--dest DIR]`, `restore FILE` (owner) |
-| Audit | `audit verify`, `audit log [--limit N] [--kind KIND]` |
+| Audit | `audit verify [--anchor FILE]`, `audit anchor [--out FILE]`, `audit log [--limit N] [--kind KIND]` |
 | Projects | `project activate [PATH]`, `project deactivate [PATH or ID]`, `project list` |
 | Tasks | `task add TITLE`, `task dep TASK --on OTHER`, `task list`, `task ready`, `task inspect`, `task start / done / fail / block / cancel / retry / unblock TASK` |
 | Planning | `plan score --tasks --depth --workstreams --files --difficulty --uncertainty --risk --verify` |
 | Templates | `template add FILE`, `template seed`, `template list`, `template inspect ID`, `template suspend / quarantine / retire / reinstate ID --reason` |
-| Agents | `agent admit --task --template [--parent] [--host]`, `agent transition ID STATE`, `agent list [--active]`, `agent inspect ID` |
-| Evaluations | `eval record ID --evaluator --category --score <key>=N --evidence`, `perf show TEMPLATE`, `recruit --cap CAP [--high-risk]` |
+| Agents | `agent admit --task --template [--parent] [--host]`, `agent transition ID STATE [--confirmed]`, `agent confirm-stop ID`, `agent list [--active]`, `agent inspect ID` |
+| Evidence | `evidence run [--timeout S] -- COMMAND...`, `evidence show ID` |
+| Evaluations | `eval record ID --evaluator INSTANCE --category --score <key>=N (all 8) --evidence EVD_ID`, `perf show TEMPLATE`, `recruit --cap CAP [--high-risk]` |
 | Memory | `memory add LAYER TEXT`, `memory search QUERY`, `memory inspect ID`, `memory correct ID TEXT`, `memory delete ID`, `memory export [--out FILE]` |
 | Handovers | `handover create --objective --next`, `handover resume ID`, `handover list` |
-| Governance | `limits show / set / host`, `budget set / show`, `stop [--lift]`, `approval request / grant / deny / consume / check / list` |
+| Governance | `limits show / set / host`, `budget set / show / use`, `stop [--lift]`, `approval request / grant / deny / consume / check / list`, `owner pin set / clear / status` |
 | Plugins | `gen codex [--out] [--force]`, `gen host --profile FILE --out DIR` |
 
 Every command has `--help`. Commands that act on a project take `--project PATH or ID` and
-default to the current directory.
+default to the current directory. Commands that act on one task, agent or evidence record by id
+refuse (exit 3, `cross_project`) when it belongs to a different project than the current one.
 
 ## Limits and budgets
 
@@ -281,12 +307,19 @@ agentos budget set project tokens_est 2000000 --id <project id>
 agentos budget show
 ```
 
+Token and paid-spend budgets are charged with `agentos budget use <instance> --tokens N` (or
+`--usd X`) **before** the work: exit 3 means it would go over, so don't do it. Once a token or
+paid-spend budget is used up, new admissions in that scope are refused (`budget_exhausted`).
 Token figures are estimates the host reports; AgentOS can't see real usage.
 
 ## Owner-only actions
 
 These ask you to type `I APPROVE <action>` at an interactive console. Agents run without one, so
 they can't confirm, and there is no environment variable or flag that skips the prompt.
+
+The phrase is shown in the prompt, so anything that can drive a terminal could type it. For a
+second factor, set an owner PIN once with `agentos owner pin set`: every confirmation then also
+asks for the PIN, unechoed. It is stored only as a salted scrypt hash and never logged.
 
 - raising any limit
 - setting a `usd` budget above `max_paid_spend_usd`
@@ -295,6 +328,7 @@ they can't confirm, and there is no environment variable or flag that skips the 
 - lifting the emergency stop
 - restoring the database from a backup
 - changing protected settings
+- grading an agent as `owner`, and setting or clearing the owner PIN
 
 ## Where your data lives
 
@@ -328,7 +362,10 @@ Generated files you edit by hand are never overwritten without `--force`.
 | `project is not activated` (exit 3) | run `agentos project activate .` in the repo |
 | `recruit` finds nothing | run `agentos template seed` to load the bundled templates |
 | `owner confirmation needs an interactive terminal` | run the command yourself in a normal terminal, not through an agent |
-| `audit verify` fails (exit 5) | the database was changed outside AgentOS; restore from a backup and investigate |
+| `audit verify` fails (exit 5) | the database was changed outside AgentOS (`reason` says how); restore from a backup and investigate |
+| admission says `max_concurrent` but nothing is running | a CANCELLED or unconfirmed TERMINATED agent still holds a slot; once its worker is really gone, `agentos agent confirm-stop <id>` |
+| `cross_project` (exit 3) | run the command from the record's repository, or pass `--project` |
+| `unverified_evidence` (exit 3) | run the check through `agentos evidence run -- <command>` and pass the `evd_` id |
 | `doctor` shows `codex_cli: UNSUPPORTED` | the Codex CLI isn't on PATH; AgentOS still works, the plugin just can't be used |
 
 ## Development

@@ -82,22 +82,71 @@ def _relatives(conn, instance_id: str) -> set[str]:
     return related
 
 
+OWNER_EVALUATOR = "owner"
+
+
+def _check_evaluator(conn, inst, evaluator_id: str, owner) -> None:
+    from agentos.governance import is_owner
+
+    if evaluator_id == OWNER_EVALUATOR:
+        if not is_owner(owner):
+            raise PolicyDenied("grading as the owner needs owner confirmation", reasons=["owner_required"])
+        return
+    row = conn.execute("SELECT project_id, state FROM agent_instances WHERE id=?", (evaluator_id,)).fetchone()
+    if not row:
+        raise PolicyDenied(f"evaluator {evaluator_id!r} is not a registered agent instance",
+                           reasons=["unknown_evaluator"])
+    if row["project_id"] != inst.project_id:
+        raise PolicyDenied("evaluator belongs to another project", reasons=["cross_project"])
+
+
+def _check_evidence(conn, inst, evidence: list[str]) -> None:
+    verified = 0
+    for ref in evidence:
+        if not ref.startswith("evd_"):
+            continue
+        row = conn.execute("SELECT project_id, finished_at FROM evidence WHERE id=?", (ref,)).fetchone()
+        if not row:
+            raise PolicyDenied(f"evidence {ref} does not exist", reasons=["unknown_evidence"])
+        if row["project_id"] != inst.project_id:
+            raise PolicyDenied(f"evidence {ref} belongs to another project", reasons=["cross_project"])
+        if row["finished_at"] < inst.created_at:
+            raise PolicyDenied(f"evidence {ref} predates the graded agent", reasons=["stale_evidence"])
+        verified += 1
+    if not verified:
+        raise PolicyDenied("at least one evidence entry must be an evd_ id from `agentos evidence run`",
+                           reasons=["unverified_evidence"])
+
+
 def record_eval(conn: sqlite3.Connection, instance_id: str, evaluator_id: str, category: str,
                 scores: dict[str, float], evidence: list[str], flags: list[Flag] | None = None,
-                external_cause: bool = False, actor: str = "host") -> Evaluation:
+                external_cause: bool = False, actor: str = "host", owner=None) -> Evaluation:
+    """Record one grade. The evaluator is a registered instance of the same project (or the confirmed
+    owner), every score key is required, and at least one evidence entry must be an `evd_` record that
+    AgentOS ran itself for this project after the graded instance existed."""
     flags = list(flags or [])
     inst = lifecycle.get_instance(conn, instance_id)
     if evaluator_id == instance_id or evaluator_id in _relatives(conn, instance_id):
         raise PolicyDenied("an agent cannot be graded by itself, its parent or its children",
                            reasons=["self_evaluation"])
-    if not [e for e in evidence if e and e.strip()]:
+    _check_evaluator(conn, inst, evaluator_id, owner)
+    missing = [k for k in WEIGHTS if k not in scores]
+    if missing:
+        raise UsageError(f"every score is required; missing: {', '.join(missing)}")
+    evidence = [e.strip() for e in evidence if e and e.strip()]
+    if not evidence:
         raise PolicyDenied("an evaluation needs at least one evidence reference", reasons=["no_evidence"])
+    _check_evidence(conn, inst, evidence)
     bad = [f for f in flags if f not in ("security_violation", "integrity_violation")]
     if bad:
         raise UsageError(f"unknown flag(s): {', '.join(bad)}")
     value = weighted(scores)
     eid = new_id("ev")
     with write_tx(conn):
+        if conn.execute("SELECT 1 FROM evaluations WHERE instance_id=? AND evaluator_id=? AND category=?",
+                        (instance_id, evaluator_id, category)).fetchone():
+            raise PolicyDenied(f"{evaluator_id} already graded {instance_id} for {category}",
+                               reasons=["duplicate_evaluation"])
         conn.execute(
             "INSERT INTO evaluations(id, instance_id, template_id, evaluator_id, category, scores, weighted, evidence,"
             " flags, external_cause, created_at) VALUES (?,?,?,?,?,?,?,?,?,?,?)",

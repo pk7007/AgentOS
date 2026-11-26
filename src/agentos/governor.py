@@ -1,13 +1,14 @@
 """Limits, budgets and atomic reservations."""
 
+import math
 import sqlite3
-from typing import Literal
+from typing import Literal, get_args
 
 from pydantic import BaseModel
 
 from agentos import audit
 from agentos.db import get_setting, put_setting, write_tx
-from agentos.errors import PolicyDenied
+from agentos.errors import PolicyDenied, UsageError
 from agentos.util import new_id, now_iso
 
 BudgetKind = Literal["agent_runs", "tokens_est", "usd"]
@@ -73,6 +74,10 @@ def set_budget(conn: sqlite3.Connection, scope: Scope, scope_id: str, kind: Budg
                actor: str, owner: object | None = None) -> None:
     from agentos.governance import is_owner
 
+    if kind not in KINDS or scope not in SCOPES:
+        raise UsageError(f"unknown budget scope/kind: {scope}/{kind}")
+    if not math.isfinite(float(limit)) or float(limit) < 0:
+        raise UsageError(f"budget limit must be a finite number >= 0, got {limit}")
     if kind == "usd" and limit > get_limits(conn).max_paid_spend_usd and not is_owner(owner):
         raise PolicyDenied("a paid-spend budget above the cap needs the owner", reasons=["owner_required"])
     with write_tx(conn):
@@ -90,9 +95,72 @@ def _used(conn, scope, scope_id, kind) -> float:
     return float(row[0])
 
 
+KINDS = get_args(BudgetKind)
+SCOPES = get_args(Scope)
+
+
+def _validate(kind: str, amount: float, chain: list[tuple[str, str]] | None = None) -> float:
+    if kind not in KINDS:
+        raise UsageError(f"unknown budget kind {kind!r}; allowed: {', '.join(KINDS)}")
+    try:
+        amount = float(amount)
+    except (TypeError, ValueError) as exc:
+        raise UsageError(f"amount is not a number: {amount!r}") from exc
+    if not math.isfinite(amount) or amount <= 0:
+        raise UsageError(f"amount must be a positive finite number, got {amount}")
+    if chain is not None:
+        if not chain:
+            raise UsageError("a reservation needs at least one scope")
+        bad = [s for s, _ in chain if s not in SCOPES]
+        if bad:
+            raise UsageError(f"unknown scope(s): {', '.join(bad)}")
+    return amount
+
+
+def exhausted(conn: sqlite3.Connection, chain: list[tuple[str, str]]) -> list[str]:
+    """Reasons for every token or paid-spend budget in `chain` that is already used up."""
+    out = []
+    for kind in ("tokens_est", "usd"):
+        for scope, scope_id in chain:
+            row = conn.execute("SELECT limit_value FROM budgets WHERE scope=? AND scope_id=? AND kind=?",
+                               (scope, scope_id, kind)).fetchone()
+            if row and _used(conn, scope, scope_id, kind) >= row[0]:
+                out.append(f"budget_exhausted:{scope}:{kind}")
+    return out
+
+
+def record_usage(conn: sqlite3.Connection, instance_id: str, kind: BudgetKind, amount: float, actor: str) -> str:
+    """Charge estimated tokens or paid spend to an agent *before* it is spent. Denied if any budget in the
+    agent's global/project/task chain would go over (or, for usd, above the owner's paid-spend cap)."""
+    from agentos.lifecycle import get_instance
+
+    if kind not in ("tokens_est", "usd"):
+        raise UsageError("usage is recorded for tokens_est or usd; agent_runs is charged by admission")
+    amount = _validate(kind, amount)
+    inst = get_instance(conn, instance_id)
+    chain = [("global", "*"), ("project", inst.project_id), ("task", inst.task_id)]
+    with write_tx(conn):
+        try:
+            rid = reserve(conn, chain, kind, amount, holder=instance_id)
+        except PolicyDenied as exc:
+            audit.append_event(conn, "budget.usage_denied", actor, {"instance_id": instance_id, "kind": kind,
+                                                                    "amount": amount, "reasons": exc.reasons},
+                               inst.project_id)
+            denied = exc
+        else:
+            denied = None
+            conn.execute("UPDATE reservations SET state='charged', actual=amount WHERE id LIKE ?", (f"{rid}:%",))
+            audit.append_event(conn, "budget.usage", actor, {"instance_id": instance_id, "kind": kind,
+                                                             "amount": amount, "reservation": rid}, inst.project_id)
+    if denied:
+        raise denied
+    return rid
+
+
 def reserve(conn: sqlite3.Connection, chain: list[tuple[str, str]], kind: BudgetKind, amount: float,
             holder: str) -> str:
     """Reserve `amount` on every scope in `chain`. Call inside the caller's write_tx."""
+    amount = _validate(kind, amount, chain)
     with write_tx(conn):
         if kind == "usd" and amount > get_limits(conn).max_paid_spend_usd:
             raise PolicyDenied("paid spend is blocked by the owner's cap", reasons=["paid_spend_blocked"])

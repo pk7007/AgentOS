@@ -1,4 +1,4 @@
-"""stop [--lift]; approval request | grant | deny | check | consume | list."""
+"""stop [--lift]; approval request | grant | deny | check | consume | list; owner pin set | clear | status."""
 
 import json
 
@@ -29,6 +29,15 @@ def register(sub, common) -> None:
     ls = s.add_parser("list", parents=[common], help="list approvals")
     ls.add_argument("--status", default=None)
     ls.set_defaults(func=cmd_list)
+
+    ow = sub.add_parser("owner", help="owner identity")
+    os_ = ow.add_subparsers(dest="owner_cmd", metavar="ACTION")
+    pin = os_.add_parser("pin", help="a PIN asked (unechoed) on every owner confirmation")
+    ps = pin.add_subparsers(dest="pin_cmd", metavar="ACTION")
+    for verb, text in (("set", "set or change the PIN"), ("clear", "remove the PIN"),
+                       ("status", "is a PIN set?")):
+        x = ps.add_parser(verb, parents=[common], help=text)
+        x.set_defaults(func=cmd_pin, verb=verb)
 
 
 def cmd_stop(args, ctx):
@@ -95,5 +104,26 @@ def cmd_list(args, ctx):
     conn = db.require_initialized()
     try:
         return [a.model_dump() for a in governance.list_approvals(conn, args.status)]
+    finally:
+        conn.close()
+
+
+def cmd_pin(args, ctx):
+    from agentos.cli import owner_guard
+    from agentos.errors import UsageError
+
+    conn = db.require_initialized()
+    try:
+        if args.verb == "status":
+            return {"owner_pin": governance.has_owner_pin(conn)}
+        owner = owner_guard(f"{args.verb} owner pin", ctx)
+        if args.verb == "clear":
+            governance.clear_owner_pin(conn, owner, ctx.actor)
+        else:
+            first = governance._default_secret("New owner PIN: ")
+            if first != governance._default_secret("Repeat the new PIN: "):
+                raise UsageError("the two PINs differ; nothing changed")
+            governance.set_owner_pin(conn, first, owner, ctx.actor)
+        return {"owner_pin": governance.has_owner_pin(conn)}
     finally:
         conn.close()

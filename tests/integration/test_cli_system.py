@@ -2,6 +2,8 @@ import hashlib
 import json
 import sqlite3
 
+from agentos import db
+
 
 def _sha(p):
     return hashlib.sha256(p.read_bytes()).hexdigest()
@@ -15,7 +17,7 @@ def test_command_before_init_exits_2(cli, home):
 def test_init_is_idempotent(cli, home):
     assert cli(["init"])[0] == 0
     code, out, _ = cli(["init", "--json"])
-    assert code == 0 and json.loads(out)["schema_version"] == 1
+    assert code == 0 and json.loads(out)["schema_version"] == db.SCHEMA_VERSION
 
 
 def test_status_after_init(cli, home):

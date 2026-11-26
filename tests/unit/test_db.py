@@ -5,8 +5,8 @@ def test_migrate_idempotent(home):
     from agentos import db
 
     c = db.connect()
-    assert db.migrate(c) == 1
-    assert db.migrate(c) == 1
+    assert db.migrate(c) == db.SCHEMA_VERSION
+    assert db.migrate(c) == db.SCHEMA_VERSION
     c.close()
 
 

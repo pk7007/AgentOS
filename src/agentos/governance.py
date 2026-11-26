@@ -54,8 +54,35 @@ def _default_prompt(message: str) -> str:
     return sys.stdin.readline()
 
 
-def confirm_owner(action: str, *, isatty=None, prompt=None) -> OwnerConfirmation:
-    """Ask the owner to type `I APPROVE <action>`. Agents run without a terminal, so they cannot confirm."""
+PIN_KEY = "governance.owner_pin"
+_SCRYPT = {"n": 2**14, "r": 8, "p": 1}
+MIN_PIN_LEN = 6
+
+
+def _default_secret(message: str) -> str:
+    import getpass
+
+    return getpass.getpass(message, stream=sys.stderr)
+
+
+def _pin_hash(pin: str, salt: bytes) -> str:
+    import hashlib
+
+    return hashlib.scrypt(pin.encode("utf-8"), salt=salt, dklen=32, **_SCRYPT).hex()
+
+
+def _pin_matches(stored: dict, pin: str) -> bool:
+    import hmac
+
+    return hmac.compare_digest(_pin_hash(pin or "", bytes.fromhex(stored["salt"])), stored["hash"])
+
+
+def confirm_owner(action: str, *, isatty=None, prompt=None, secret=None, conn=None) -> OwnerConfirmation:
+    """Ask the owner to type `I APPROVE <action>`. Agents run without a terminal, so they cannot confirm.
+
+    The phrase is printed in the prompt, so anything driving a terminal could type it. Once the owner sets
+    a PIN (`agentos owner pin set`), the PIN is also asked for, unechoed, and it is never printed or logged.
+    """
     isatty = isatty or _default_isatty
     prompt = prompt or _default_prompt
     if not isatty():
@@ -65,7 +92,32 @@ def confirm_owner(action: str, *, isatty=None, prompt=None) -> OwnerConfirmation
     answer = prompt(f"Owner confirmation for '{action}'. Type exactly: {expected}\n> ")
     if (answer or "").strip() != expected:
         raise PolicyDenied("owner confirmation phrase did not match", reasons=["owner_phrase_mismatch"])
+    stored = get_setting(conn, PIN_KEY) if conn is not None else None
+    if stored and not _pin_matches(stored, (secret or _default_secret)("Owner PIN: ")):
+        raise PolicyDenied("owner PIN did not match", reasons=["owner_pin_mismatch"])
     return OwnerConfirmation(action, util.now_iso(), _SENTINEL)
+
+
+def set_owner_pin(conn: sqlite3.Connection, pin: str, owner, actor: str) -> None:
+    """Set or change the owner PIN. Changing it needs the current PIN, because confirm_owner asks for it."""
+    require_owner(owner, "setting the owner PIN")
+    if len(pin or "") < MIN_PIN_LEN:
+        raise PolicyDenied(f"the PIN must be at least {MIN_PIN_LEN} characters", reasons=["weak_pin"])
+    salt = os.urandom(16)
+    with write_tx(conn):
+        put_setting(conn, PIN_KEY, {"salt": salt.hex(), "hash": _pin_hash(pin, salt), "kdf": "scrypt", **_SCRYPT})
+        audit.append_event(conn, "governance.owner_pin_set", actor, {"owner_action": owner.action})
+
+
+def clear_owner_pin(conn: sqlite3.Connection, owner, actor: str) -> None:
+    require_owner(owner, "clearing the owner PIN")
+    with write_tx(conn):
+        conn.execute("DELETE FROM settings WHERE key=?", (PIN_KEY,))
+        audit.append_event(conn, "governance.owner_pin_cleared", actor, {"owner_action": owner.action})
+
+
+def has_owner_pin(conn: sqlite3.Connection) -> bool:
+    return bool(get_setting(conn, PIN_KEY))
 
 
 def is_owner(owner) -> bool:

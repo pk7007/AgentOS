@@ -2,6 +2,7 @@ from agentos import performance, recruit, templates
 from agentos.performance import WEIGHTS
 from agentos.templates import AgentTemplate, TemplateStatus
 from agentos.util import new_id, now_iso
+from tests.conftest import add_evidence
 
 
 def _tpl(conn, tid, caps):
@@ -19,9 +20,12 @@ def _inst(conn, tid, project, task):
 
 
 def _evals(conn, iid, score, n):
-    for i in range(n):
-        performance.record_eval(conn, iid, f"rev{i}", "coding", {k: score for k in WEIGHTS},
-                                evidence=["pytest"], actor="t")
+    row = conn.execute("SELECT project_id, task_id FROM agent_instances WHERE id=?", (iid,)).fetchone()
+    project, task = type("P", (), {"id": row[0]}), type("T", (), {"id": row[1]})
+    for _ in range(n):
+        peer = _inst(conn, "reviewer", project, task)
+        performance.record_eval(conn, iid, peer, "coding", {k: score for k in WEIGHTS},
+                                evidence=[add_evidence(conn, row[0])], actor="t")
 
 
 def test_rank_prefers_match(seeded):

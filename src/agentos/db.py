@@ -10,7 +10,7 @@ from agentos import paths
 from agentos.errors import IntegrityError, NotInitialized
 from agentos.util import now_iso
 
-SCHEMA_VERSION = 1
+SCHEMA_VERSION = 2
 
 
 def connect(path: Path | None = None) -> sqlite3.Connection:

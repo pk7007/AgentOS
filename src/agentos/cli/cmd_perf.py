@@ -9,12 +9,16 @@ def register(sub, common) -> None:
     es = ev.add_subparsers(dest="eval_cmd", metavar="ACTION")
     rec = es.add_parser("record", parents=[common], help="record an evaluation by a different agent")
     rec.add_argument("instance")
-    rec.add_argument("--evaluator", required=True, help="who evaluated (not the agent itself, its parent or child)")
+    rec.add_argument("--evaluator", required=True,
+                     help="instance id of the grading agent in this project (not the agent itself, its parent or "
+                          "child), or 'owner' (asks for owner confirmation)")
     rec.add_argument("--category", required=True)
     rec.add_argument("--score", action="append", default=[], help="key=value, 0-100 (repeatable)")
-    rec.add_argument("--evidence", action="append", default=[], help="test command, file or log (repeatable)")
+    rec.add_argument("--evidence", action="append", default=[],
+                     help="evd_ id from `agentos evidence run` (at least one), or a note (repeatable)")
     rec.add_argument("--flag", action="append", default=[], choices=["security_violation", "integrity_violation"])
     rec.add_argument("--external", action="store_true", help="failure caused outside the agent's control")
+    rec.add_argument("--project", default=None, help="project id or repo path (default: cwd)")
     rec.set_defaults(func=cmd_record)
 
     pf = sub.add_parser("perf", help="performance summaries")
@@ -45,10 +49,19 @@ def _scores(items: list[str]) -> dict[str, float]:
 
 
 def cmd_record(args, ctx):
+    from agentos import lifecycle
+    from agentos.cli import owner_guard, require_project
+
     conn = db.require_initialized()
     try:
-        e = performance.record_eval(conn, args.instance, args.evaluator, args.category, _scores(args.score),
-                                    args.evidence, args.flag, args.external, ctx.actor)
+        scores = _scores(args.score)
+        inst = lifecycle.get_instance(conn, args.instance)
+        require_project(conn, args, inst.project_id, f"agent {inst.id}")
+        owner = None
+        if args.evaluator == performance.OWNER_EVALUATOR:
+            owner = owner_guard(f"grade {inst.id} {args.category}", ctx)
+        e = performance.record_eval(conn, args.instance, args.evaluator, args.category, scores,
+                                    args.evidence, args.flag, args.external, ctx.actor, owner=owner)
         return e.model_dump()
     finally:
         conn.close()

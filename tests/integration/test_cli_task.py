@@ -1,7 +1,8 @@
 import json
 
 
-def test_task_flow_via_cli(cli, home, repo):
+def test_task_flow_via_cli(cli, home, repo, monkeypatch):
+    monkeypatch.chdir(repo)
     cli(["init"])
     assert cli(["project", "activate", str(repo)])[0] == 0
     code, out, _ = cli(["task", "add", "Write parser", "--project", str(repo), "--cap", "python", "--json"])

@@ -28,6 +28,7 @@ def register(sub, common) -> None:
     d = s.add_parser("dep", parents=[common], help="TASK depends on --on OTHER")
     d.add_argument("task")
     d.add_argument("--on", required=True)
+    add_project_arg(d)
     d.set_defaults(func=cmd_dep)
     ls = s.add_parser("list", parents=[common], help="list tasks")
     add_project_arg(ls)
@@ -38,11 +39,13 @@ def register(sub, common) -> None:
     r.set_defaults(func=cmd_ready)
     i = s.add_parser("inspect", parents=[common], help="show one task")
     i.add_argument("task")
+    add_project_arg(i)
     i.set_defaults(func=cmd_inspect)
     for verb, state in _MOVES.items():
         m = s.add_parser(verb, parents=[common], help=f"move a task ({state.value})")
         m.add_argument("task")
         m.add_argument("--note", default=None)
+        add_project_arg(m)
         m.set_defaults(func=cmd_move, verb=verb)
 
     plan = sub.add_parser("plan", help="planning helpers")
@@ -75,9 +78,18 @@ def cmd_add(args, ctx):
         conn.close()
 
 
+def _owned(conn, args, task_id):
+    from agentos.cli import require_project
+
+    t = tasks.get_task(conn, task_id)
+    require_project(conn, args, t.project_id, f"task {t.id}")
+    return t
+
+
 def cmd_dep(args, ctx):
     conn = db.require_initialized()
     try:
+        _owned(conn, args, args.task)
         tasks.add_dependency(conn, args.task, args.on, ctx.actor)
         return tasks.get_task(conn, args.task).model_dump(mode="json")
     finally:
@@ -107,7 +119,7 @@ def cmd_ready(args, ctx):
 def cmd_inspect(args, ctx):
     conn = db.require_initialized()
     try:
-        return tasks.get_task(conn, args.task).model_dump(mode="json")
+        return _owned(conn, args, args.task).model_dump(mode="json")
     finally:
         conn.close()
 
@@ -115,6 +127,7 @@ def cmd_inspect(args, ctx):
 def cmd_move(args, ctx):
     conn = db.require_initialized()
     try:
+        _owned(conn, args, args.task)
         return tasks.set_state(conn, args.task, _MOVES[args.verb], ctx.actor, args.note).model_dump(mode="json")
     finally:
         conn.close()

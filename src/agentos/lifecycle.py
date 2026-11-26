@@ -115,6 +115,47 @@ def active_count(conn: sqlite3.Connection) -> int:
                         [s.value for s in ACTIVE_STATES]).fetchone()[0]
 
 
+# A worker holds a concurrency slot while it may still be running: in an active state, after a
+# cancel request, or after a termination the host has not confirmed at the runtime.
+_SLOT_SQL = (f"state IN ({','.join(repr(s.value) for s in sorted(ACTIVE_STATES))}) OR state='CANCELLED' "
+             "OR (state='TERMINATED' AND coalesce(termination_confirmed, 0)=0)")
+
+
+def slot_count(conn: sqlite3.Connection) -> int:
+    return conn.execute(f"SELECT count(*) FROM agent_instances WHERE {_SLOT_SQL}").fetchone()[0]
+
+
+def _stop_unconfirmed(inst: "AgentInstance") -> bool:
+    return inst.state == S.CANCELLED or (inst.state == S.TERMINATED and not inst.termination_confirmed)
+
+
+def confirm_stopped(conn: sqlite3.Connection, instance_id: str, actor: str) -> AgentInstance:
+    """The host confirms the runtime worker is gone. CANCELLED becomes TERMINATED; either way the slot frees."""
+    inst = get_instance(conn, instance_id)
+    if inst.state == S.CANCELLED:
+        return transition(conn, instance_id, S.TERMINATED, actor, reason="runtime stop confirmed",
+                          runtime_confirmed=True)
+    if inst.state != S.TERMINATED or inst.termination_confirmed:
+        raise PolicyDenied(f"nothing to confirm: agent is {inst.display_state()}", reasons=["not_stopping"])
+    with write_tx(conn):
+        conn.execute("UPDATE agent_instances SET termination_confirmed=1, updated_at=? WHERE id=?",
+                     (now_iso(), instance_id))
+        audit.append_event(conn, "agent.stop_confirmed", actor, {"instance_id": instance_id}, inst.project_id)
+    return get_instance(conn, instance_id)
+
+
+def _entry_reasons(conn, inst: "AgentInstance", to: AgentState, runtime_confirmed) -> list[str]:
+    """Checks beyond the state graph: re-entering active work goes through admission's checks, and a
+    worker whose stop is unconfirmed can only be archived once the host confirms it."""
+    if to in ACTIVE_STATES and inst.state not in ACTIVE_STATES:
+        from agentos.admission import standing_reasons
+
+        return standing_reasons(conn, inst.project_id, inst.task_id, inst.template_id)[0]
+    if to == S.ARCHIVED and _stop_unconfirmed(inst) and not runtime_confirmed:
+        return ["termination_unconfirmed"]
+    return []
+
+
 def transition(conn: sqlite3.Connection, instance_id: str, to: AgentState, actor: str,
                reason: str | None = None, runtime_confirmed: bool | None = None) -> AgentInstance:
     from agentos import governor
@@ -123,15 +164,27 @@ def transition(conn: sqlite3.Connection, instance_id: str, to: AgentState, actor
     with write_tx(conn):
         inst = get_instance(conn, instance_id)
         if not can_transition(inst.state, to):
+            reasons, message = ["illegal_transition"], f"cannot move agent from {inst.state.value} to {to.value}"
+        else:
+            reasons = _entry_reasons(conn, inst, to, runtime_confirmed)
+            message = f"agent cannot move from {inst.state.value} to {to.value}: {', '.join(reasons)}"
+            if not reasons and to in ACTIVE_STATES and inst.state not in ACTIVE_STATES:
+                from agentos.admission import chain_for
+
+                try:
+                    governor.reserve(conn, chain_for(inst.project_id, inst.task_id), "agent_runs", 1,
+                                     holder=instance_id)
+                except PolicyDenied as exc:
+                    reasons, message = exc.reasons, exc.message
+        if reasons:
             audit.append_event(conn, "agent.transition_denied", actor,
-                               {"instance_id": instance_id, "from": inst.state.value, "to": to.value},
-                               inst.project_id)
-            denied = PolicyDenied(f"cannot move agent from {inst.state.value} to {to.value}",
-                                  reasons=["illegal_transition"])
+                               {"instance_id": instance_id, "from": inst.state.value, "to": to.value,
+                                "reasons": reasons}, inst.project_id)
+            denied = PolicyDenied(message, reasons=reasons)
         else:
             denied = None
             confirmed = inst.termination_confirmed
-            if to == S.TERMINATED:
+            if to == S.TERMINATED or (to == S.ARCHIVED and _stop_unconfirmed(inst)):
                 confirmed = bool(runtime_confirmed)
             conn.execute(
                 "UPDATE agent_instances SET state=?, termination_confirmed=?, last_reason=?, updated_at=? WHERE id=?",

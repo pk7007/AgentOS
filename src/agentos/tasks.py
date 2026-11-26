@@ -128,12 +128,14 @@ def _reaches(conn, start: str, target: str) -> bool:
 
 
 def add_dependency(conn: sqlite3.Connection, task_id: str, depends_on: str, actor: str) -> None:
-    task, dep = get_task(conn, task_id), get_task(conn, depends_on)
-    if task.project_id != dep.project_id:
-        raise PolicyDenied("tasks are in different projects", reasons=["cross_project"])
-    if task_id == depends_on or _reaches(conn, depends_on, task_id):
-        raise PolicyDenied("dependency would create a cycle", reasons=["cycle"])
+    # The cycle check and the insert share one immediate transaction, so two sessions adding A->B and
+    # B->A at the same time cannot both pass the check.
     with write_tx(conn):
+        task, dep = get_task(conn, task_id), get_task(conn, depends_on)
+        if task.project_id != dep.project_id:
+            raise PolicyDenied("tasks are in different projects", reasons=["cross_project"])
+        if task_id == depends_on or _reaches(conn, depends_on, task_id):
+            raise PolicyDenied("dependency would create a cycle", reasons=["cycle"])
         conn.execute("INSERT OR IGNORE INTO task_deps VALUES (?, ?)", (task_id, depends_on))
         audit.append_event(conn, "task.dep_added", actor, {"task_id": task_id, "depends_on": depends_on},
                            task.project_id)

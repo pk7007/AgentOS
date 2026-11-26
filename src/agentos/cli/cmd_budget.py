@@ -1,4 +1,4 @@
-"""budget set | show; limits show | set | host."""
+"""budget set | show | use; limits show | set | host."""
 
 from agentos import db, governor
 
@@ -14,6 +14,13 @@ def register(sub, common) -> None:
     st.set_defaults(func=cmd_budget_set)
     sh = bs.add_parser("show", parents=[common], help="limits, use and what remains")
     sh.set_defaults(func=cmd_budget_show)
+    us = bs.add_parser("use", parents=[common],
+                       help="charge estimated tokens or paid spend to an agent before spending (exit 3 = over budget)")
+    us.add_argument("instance")
+    us.add_argument("--tokens", type=float, default=None, help="estimated tokens about to be used")
+    us.add_argument("--usd", type=float, default=None, help="paid spend about to happen")
+    us.add_argument("--project", default=None, help="project id or repo path (default: cwd)")
+    us.set_defaults(func=cmd_budget_use)
 
     lm = sub.add_parser("limits", help="hard limits on workers, depth, retries and paid spend")
     ls = lm.add_subparsers(dest="limits_cmd", metavar="ACTION")
@@ -48,6 +55,26 @@ def cmd_budget_show(args, ctx):
     conn = db.require_initialized()
     try:
         return governor.budget_report(conn)
+    finally:
+        conn.close()
+
+
+def cmd_budget_use(args, ctx):
+    from agentos import lifecycle
+    from agentos.cli import require_project
+    from agentos.errors import UsageError
+
+    if args.tokens is None and args.usd is None:
+        raise UsageError("give --tokens and/or --usd")
+    conn = db.require_initialized()
+    try:
+        inst = lifecycle.get_instance(conn, args.instance)
+        require_project(conn, args, inst.project_id, f"agent {inst.id}")
+        charged = {}
+        for kind, amount in (("tokens_est", args.tokens), ("usd", args.usd)):
+            if amount is not None:
+                charged[kind] = governor.record_usage(conn, inst.id, kind, amount, ctx.actor)
+        return {"instance_id": inst.id, "charged": charged, "budgets": governor.budget_report(conn)}
     finally:
         conn.close()
 
