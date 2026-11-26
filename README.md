@@ -147,8 +147,8 @@ left alone. `agentos hook config codex` prints the hooks file if you'd rather pu
 Optional and slower: `agentos hook config codex --guard-tools` checks **every** tool call, so a
 cancelled worker's calls are refused. Use that file *instead of* the plugin hooks; if both run,
 a spawn is still claimed only once, but each call starts `agentos` twice. Whether Codex puts the
-subagent's `agent_id` on its tool-call events is not verified yet; without it this guard can't
-tell a worker's calls apart and lets them through.
+subagent's `agent_id` on its tool-call events is not verified yet (the second host, `cc`, does);
+without it this guard can't tell a worker's calls apart and lets them through.
 
 ## Quickstart
 

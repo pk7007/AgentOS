@@ -203,3 +203,27 @@ def test_unknown_host_is_a_usage_error(seeded, repo):
 def test_events_without_a_cwd_are_ignored(seeded, project):
     r = runtime.handle(seeded, "codex", {"hook_event_name": "PreToolUse", "tool_name": "spawn_agent"})
     assert r.output is None
+
+
+def test_repeated_subagent_stop_is_idempotent(seeded, project, repo, task):
+    """Seen live: the runtime can send SubagentStop twice for one subagent."""
+    iid = _ticket(seeded, project, task)
+    runtime.handle(seeded, "codex", _spawn(repo))
+    runtime.handle(seeded, "codex", _start(repo, "agt_6"))
+    lifecycle.transition(seeded, iid, lifecycle.AgentState.CANCELLED, "owner")
+    runtime.handle(seeded, "codex", _stop(repo, "agt_6"))
+    first = runtime.binding(seeded, iid)["stopped_at"]
+    runtime.handle(seeded, "codex", _stop(repo, "agt_6"))
+    assert runtime.binding(seeded, iid)["stopped_at"] == first
+    inst = lifecycle.get_instance(seeded, iid)
+    assert inst.state == lifecycle.AgentState.TERMINATED and inst.termination_confirmed is True
+
+
+def test_main_thread_calls_without_agent_id_pass_guard_mode(seeded, project, repo, task):
+    """Seen live: the main session's tool calls carry no agent_id; a subagent's carry its own."""
+    iid = _ticket(seeded, project, task, host="cc")
+    assert runtime.handle(seeded, "cc", _spawn(repo, tool="Agent")).instance_id == iid
+    runtime.handle(seeded, "cc", _start(repo, "a1"))
+    lifecycle.transition(seeded, iid, lifecycle.AgentState.CANCELLED, "owner")
+    assert runtime.handle(seeded, "cc", _spawn(repo, tool="Glob", call="c2")).output is None
+    assert _denied(runtime.handle(seeded, "cc", _spawn(repo, tool="Glob", call="c3", agent_id="a1")))

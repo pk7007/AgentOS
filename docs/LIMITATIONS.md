@@ -18,7 +18,9 @@ instance. What that still doesn't cover:
   `hooks/list`, no model call), and the handler follows the documented hook protocol in tests. A
   live session spawning a real subagent through the hook has **not** been run yet; it needs the
   owner's go-ahead because it uses quota.
-- The second host (`cc`) hook file is generated but not tested with that host.
+- Second host (`cc`): checked live on 2026-11-26 with version 2.1.331, in a throwaway AgentOS home: a spawn with no admitted instance was refused with AgentOS's reason; a spawn naming an admitted instance was allowed, bound to the runtime's agent id and moved to RUNNING, and its stop was recorded; `audit verify` passed. That host sent SubagentStop twice for one subagent
+  (handled), and reports the parent's `session_id` for a subagent. A subagent's tool calls carry
+  its `agent_id` there and the main session's don't, so `--guard-tools` can tell them apart.
 
 ## Owner confirmation trusts the console
 
@@ -52,7 +54,8 @@ TERMINATED records the intent. Until the host confirms the worker really stopped
 must confirm the stop to free the slot. With the runtime hooks on, the runtime's own
 SubagentStop event confirms it. AgentOS still cannot kill a running subagent; with
 `hook config --guard-tools` its tool calls are refused once it is cancelled, but only if the
-runtime identifies the subagent on those calls, which is unverified for Codex.
+runtime identifies the subagent on those calls: the second host (`cc`) does (seen live), Codex is
+unverified.
 
 ## Secret redaction is pattern-based
 

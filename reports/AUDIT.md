@@ -18,7 +18,7 @@ which criterion Z forbids. The spec's 9/10 target is therefore **not claimed** f
 A row is VERIFIED only when a test or recorded command shows it.
 
 Evidence paths are relative to `tests/`. Test run at time of writing (after V4.0 Phase 2,
-runtime hooks): `python -m pytest -q` gives **422 passed** (the live test is excluded by
+runtime hooks): `python -m pytest -q` gives **425 passed** (the live test is excluded by
 default). Branch coverage is 95% overall: runtime 93%, hook CLI 100%, admission 96%, audit 97%, evidence 95%, governance 97%, governor 96%, lifecycle 97%, performance 95%, redact 100%. After Phase 1 it was 381 passed. `ruff check src tests` is clean. A fresh clone of the pre-fix commit `1b7d492` gave
 303 passed and a clean ruff run, which is the Phase 0 baseline.
 
@@ -173,7 +173,7 @@ about what AgentOS *records and enforces*, not about decision quality, which sli
 | Second host (`cc`) compatibility | UNVERIFIED | `unit/test_gen.py::test_host_generate_uses_profile`; files generated locally from a git-excluded profile | not loaded by the real host yet |
 | Skills compatibility | PARTIAL | `unit/test_skill_commands.py` (every command in the skill parses with the real CLI; score keys exist) | a live host following the skill is BLOCKED (see Q) |
 | MCP integration | NOT BUILT | none | |
-| Hooks and plugin support | PARTIAL | the plugin ships `hooks/hooks.json`; the real Codex CLI 0.171.0 discovers all three hooks with no errors, untrusted until the owner trusts them: `integration/test_codex_hook_discovery.py` (app-server `hooks/list`, no model call); handler: `unit/test_runtime.py` | a live spawn through the hook is not run yet; `cc` hook file generated, not loaded by that host |
+| Hooks and plugin support | PARTIAL | the plugin ships `hooks/hooks.json`; the real Codex CLI 0.171.0 discovers all three hooks with no errors, untrusted until the owner trusts them: `integration/test_codex_hook_discovery.py` (app-server `hooks/list`, no model call); handler: `unit/test_runtime.py` | a live spawn through the Codex hook is not run yet (no quota); the `cc` host ran it live (see Phase 2) |
 
 ## O: Observability
 
@@ -201,7 +201,7 @@ about what AgentOS *records and enforces*, not about decision quality, which sli
 | --- | --- | --- | --- |
 | Acceptance criteria | PARTIAL | `task add --accept` is stored | not checked automatically |
 | Independent evaluation | VERIFIED | `unit/test_performance.py::test_self_eval_rejected`, `::test_parent_and_child_eval_rejected` | |
-| Testing | VERIFIED | 422 tests across unit, integration, security and concurrency | |
+| Testing | VERIFIED | 425 tests across unit, integration, security and concurrency | |
 | Regression prevention | VERIFIED | `unit/test_gen.py::test_committed_codex_plugin_is_up_to_date`, `unit/test_skill_commands.py`; CI in `.github/workflows/ci.yml` (lint and tests, Windows and Ubuntu, Python 3.11 and 3.12) | first run (45842647948) failed on Ubuntu only: a test assumed case-insensitive paths; fixed in `b8a2a74`, then run 45843512290 passed on all four jobs. The Codex discovery test skips on CI, which has no Codex CLI |
 | Evidence integrity | VERIFIED | evidence required, audit chain tamper-evident (see O) | |
 | Live host follows the skill | **BLOCKED** | `live/test_codex_smoke.py::test_codex_follows_skill` (written, **not run**) | uses the owner's Codex quota; runs only with `pytest -m live` after the owner's go-ahead |
@@ -506,9 +506,9 @@ the published hooks documentation says `PreToolUse` can deny a tool call (includ
 | --- | --- | --- | --- |
 | Spawn gate (`PreToolUse` on `spawn_agent`/`Agent`) | VERIFIED in tests | `unit/test_runtime.py::test_spawn_without_a_ticket_is_denied`, `::test_spawn_with_a_ticket_is_allowed_once`, `::test_named_ticket_is_claimed_and_unavailable_names_are_denied`, `::test_ticket_from_another_project_cannot_be_named`, `::test_the_same_spawn_call_checked_twice_claims_one_ticket` | live spawn not run |
 | Fail closed | VERIFIED in tests | `integration/test_cli_hook.py::test_hook_failure_refuses_spawn_but_not_other_tools` | |
-| Binding and RUNNING on start | VERIFIED in tests | `unit/test_runtime.py::test_subagent_start_binds_and_starts_running`, `::test_unadmitted_subagent_is_recorded_and_told` | which `session_id` Codex reports for a subagent is unverified; the binder prefers the same session and falls back to the oldest claim in the project |
+| Binding and RUNNING on start | VERIFIED in tests | `unit/test_runtime.py::test_subagent_start_binds_and_starts_running`, `::test_unadmitted_subagent_is_recorded_and_told` | seen live on `cc`: a subagent reports its parent's `session_id`, which the binder prefers; Codex unverified |
 | Stop confirmation | VERIFIED in tests | `::test_subagent_stop_confirms_a_requested_cancel`, `::test_subagent_stop_of_running_work_only_records_it` | |
-| Cancelled worker's tool calls refused (`--guard-tools`) | PARTIAL | `::test_tool_calls_of_a_cancelled_subagent_are_denied`, `::test_emergency_stop_denies_tool_calls_of_bound_subagents` | works only if Codex sends `agent_id` on a subagent's tool calls, unverified |
+| Cancelled worker's tool calls refused (`--guard-tools`) | PARTIAL | `::test_tool_calls_of_a_cancelled_subagent_are_denied`, `::test_emergency_stop_denies_tool_calls_of_bound_subagents` | needs `agent_id` on a subagent's tool calls: seen live on `cc` (`::test_main_thread_calls_without_agent_id_pass_guard_mode` mirrors it); Codex unverified |
 | Real process, UTF-8 stdin, non-ASCII path | VERIFIED | `integration/test_cli_hook.py::test_real_process_with_a_non_ascii_path` | |
 | Codex loads the plugin hooks | VERIFIED | `integration/test_codex_hook_discovery.py` (real CLI, throwaway `CODEX_HOME`, no model call) | they stay untrusted until the owner trusts them in `/hooks` |
-| Second host (`cc`) | UNVERIFIED | `unit/test_gen.py::test_host_profile_can_ship_runtime_hooks`; spawn tools `Task`/`Agent` in `::test_cc_host_spawn_tools` | not loaded by that host |
+| Second host (`cc`) spawn gate | VERIFIED (live) | live on 2026-11-26 with version 2.1.331, in a throwaway AgentOS home: a spawn with no admitted instance was refused with AgentOS's reason; a spawn naming an admitted instance was allowed, bound to the runtime's agent id and moved to RUNNING, and its stop was recorded; `audit verify` passed; repeated SubagentStop seen live, now `::test_repeated_subagent_stop_is_idempotent` | the generated plugin itself was not installed in that host; the hooks were loaded from a local settings file |
