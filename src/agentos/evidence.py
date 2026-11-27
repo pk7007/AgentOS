@@ -49,7 +49,7 @@ WRAPPERS = {"cmd", "bash", "sh", "zsh", "dash", "powershell", "pwsh", "env", "py
 
 
 def _prog(word: str) -> str:
-    prog = Path(word.strip().strip('"\'')).name.lower()
+    prog = re.split(r"[\\/]", word.strip().strip('"\''))[-1].lower()  # either separator, whatever the OS
     for suffix in (".exe", ".cmd", ".bat", ".ps1"):
         prog = prog.removesuffix(suffix)
     return re.sub(r"^(pip|python)\d+(\.\d+)*$", r"\1", prog)  # pip3.12 is pip, python3.11 is python
