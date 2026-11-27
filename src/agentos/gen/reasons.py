@@ -5,27 +5,13 @@ A reason is a short code in a refusal (`PolicyDenied(..., reasons=[...])`, exit 
 decision (`reasons.append(...)`). The scan reads the source's syntax tree; it does not run anything."""
 
 import ast
+import re
 from collections import defaultdict
 from pathlib import Path
 
-SRC = Path(__file__).resolve().parents[1]
+from agentos.gen.reason_guide import MEANING, REMEDY
 
-# what to do about the reasons people meet most; every other reason's message says what went wrong
-HINTS = {
-    "owner_required": "run the command at a real terminal as the owner and type the confirmation phrase",
-    "emergency_stop": "the owner lifts it with `agentos stop --lift` once the cause is fixed",
-    "cross_project": "run the command from the repository the item belongs to, or pass `--project`",
-    "path_claimed": "another active worker holds the path: message it, wait, or pick other work",
-    "not_active": "the worker has stopped; admit a new one",
-    "max_concurrent": "wait for a worker to finish, or the owner raises the limit",
-    "project_max_concurrent": "wait for a worker of this project to finish, or loosen `policy project-limit`",
-    "tampered": "the stored item no longer matches its hash; save it again from a trusted copy",
-    "dependencies_incomplete": "finish the tasks this one depends on first (`agentos task ready`)",
-    "capability_mismatch": "pick a template whose capabilities cover the task (`agentos recruit --cap CAPABILITY`)",
-    "template_unavailable": "the template is suspended, retired or missing (`agentos template list`)",
-    "not_delivered": "only a delivered objective can be saved as a workflow",
-    "no_acceptance_criteria": "add acceptance criteria to the objective before delivering it",
-}
+SRC = Path(__file__).resolve().parents[1]
 
 
 def _strings(node) -> list[str]:
@@ -34,17 +20,22 @@ def _strings(node) -> list[str]:
     return []
 
 
+def _text(node) -> str:
+    """A message as written, with each computed part shown as an ellipsis."""
+    if isinstance(node, ast.Constant) and isinstance(node.value, str):
+        return node.value
+    if isinstance(node, ast.JoinedStr):
+        return "".join(v.value if isinstance(v, ast.Constant) else "…" for v in node.values)
+    if isinstance(node, ast.BinOp) and isinstance(node.op, ast.Add):
+        return _text(node.left) + _text(node.right)
+    return "…"
+
+
 def _message(call: ast.Call) -> str:
     if not call.args:
         return ""
-    arg = call.args[0]
-    if isinstance(arg, ast.Constant) and isinstance(arg.value, str):
-        return arg.value
-    if isinstance(arg, ast.JoinedStr):
-        return "".join(v.value if isinstance(v, ast.Constant) else "…" for v in arg.values)
-    if isinstance(arg, ast.BinOp):
-        return "".join(v.value for v in ast.walk(arg) if isinstance(v, ast.Constant) and isinstance(v.value, str)) + "…"
-    return ""
+    text = re.sub("…+", "…", _text(call.args[0]))
+    return "" if text == "…" else text
 
 
 def scan(src: Path = SRC) -> dict[str, dict]:
@@ -86,8 +77,8 @@ def render() -> str:
            "| Reason | Raised in | Message | What to do |", "| --- | --- | --- | --- |"]
     for code, info in reasons.items():
         where = ", ".join(f"`{w}`" for w in info["where"][:4]) + (" …" if len(info["where"]) > 4 else "")
-        msg = info["message"].replace("|", "/").replace("\n", " ")
-        out.append(f"| `{code}` | {where} | {msg} | {HINTS.get(code, '')} |")
+        msg = (info["message"] or MEANING.get(code, "")).replace("|", "/").replace("\n", " ")
+        out.append(f"| `{code}` | {where} | {msg} | {REMEDY.get(code, '')} |")
     return "\n".join(out) + "\n"
 
 

@@ -115,14 +115,22 @@ def _unique(path: Path) -> Path:
 
 
 def backup(conn: sqlite3.Connection, dest_dir: Path | None = None, prefix: str = "agentos") -> Path:
+    from agentos.errors import UsageError
+
     dest_dir = Path(dest_dir) if dest_dir else paths.backups_dir()
-    dest_dir.mkdir(parents=True, exist_ok=True)
-    dest = _unique(dest_dir / f"{prefix}-{_stamp()}.db")
-    target = sqlite3.connect(str(dest))
+    try:
+        dest_dir.mkdir(parents=True, exist_ok=True)
+        dest = _unique(dest_dir / f"{prefix}-{_stamp()}.db")
+        target = sqlite3.connect(str(dest))
+    except (OSError, sqlite3.Error) as exc:
+        raise UsageError(f"cannot write a backup to {dest_dir}: {exc}") from exc
     try:
         conn.backup(target)
-    finally:
+    except sqlite3.Error as exc:
         target.close()
+        dest.unlink(missing_ok=True)  # never leave a half-written backup that looks complete
+        raise UsageError(f"the backup to {dest} failed and was removed: {exc}") from exc
+    target.close()
     return dest
 
 

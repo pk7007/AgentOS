@@ -154,8 +154,10 @@ offers tools only (no resources or prompts).
 
 ## Retention never touches the audit log
 
-Deleted memory is aged by when it was written, not when it was deleted (the record keeps no deletion
-time), so a record written long ago and deleted today can be removed at the next `retention apply`.
+Deleted or superseded memory is aged from when it was deleted or corrected, as the audit log records
+it, so a record written long ago and deleted today is kept for the whole retention period. Removing
+superseded versions shortens `memory history`. Evidence output tails and handover files are never
+pruned.
 
 The audit log is a hash chain and is kept in full; removing events would make it unverifiable. Payloads
 are redacted when they are written.
@@ -165,6 +167,61 @@ are redacted when they are written.
 `pip install --require-hashes` checks every locked package. The build backend (setuptools) fetched for
 `pip install -e .` is not hash-checked, and the wheel does not contain `definitions/`, so commands that
 read the bundled definitions (`template seed`, `bench run`) need a checkout.
+
+## `evidence run` refuses the obvious outside commands, it is not a sandbox
+
+A command that reaches outside this machine (curl, wget, ssh, `gh`, `git push` or `fetch`, `pip install`,
+`npm install` or `publish`, package runners such as `npx` and `uvx`, system and language package
+managers, and the same commands behind `cmd /c`, `bash -c`, `powershell -c` or `python -m`) is refused
+unless the owner confirms it at a terminal, and the refusal is recorded. With `--json` the refusal also
+names the remedy. The check reads the command line against fixed lists: code run inline (`python -c`,
+`node -e`), a test script that opens a connection itself, and any tool not on the lists are not caught;
+a word such as `push` given to `git` for another purpose is a false alarm that asks the owner.
+
+## The automatic stale-worker check needs a host that reports
+
+On a tool call, the hook fails workers of the project that were heard from (an allowed tool call or a
+heartbeat) and then fell silent for an hour, at most once every five minutes. A worker that was never
+heard from is left alone, because it cannot be told apart from a busy one; `agentos health stale` lists it
+for a person. A single tool call that runs longer than an hour looks like silence. The note a worker
+leaves at termination is the host's to write: AgentOS flags a termination without one
+(`no_handover_note`) but cannot recover what was not written, and a worker failed by the check leaves
+no note.
+
+## Smaller stated limits
+
+- **Layering.** The core never imports the CLI and imports only the standard library and pydantic,
+  checked over the syntax tree. The one named exception is `gen/clidocs.py`, which reads the parser to
+  write `docs/CLI.md`. Boundaries between core modules are not checked. A second runtime dependency
+  would need that rule changed on purpose.
+- **Departments.** A department lead is suggested from fixed thresholds (see the Boss loop above); they
+  advise and are not tuned.
+- **Provenance.** Every memory record and every correction must name its source and author, but both
+  are free text from the caller, not authenticated identities.
+- **Model availability.** `doctor` checks that each host profile's `[models]` table names known tiers
+  and that host CLIs are on PATH. It never asks a provider whether a model or quota is available.
+- **Acceptance criteria.** Each criterion must map to passing, independently graded evidence; whether
+  that evidence meets the criterion's words is the grader's judgement.
+- **Error handling.** A damaged database, a busy database and a file error each get their own message
+  and exit code; a mistyped command gets the closest real ones, a mistyped option gets argparse's own
+  message without a suggestion.
+- **Circuit breaker.** The window and floor are defaults the owner can tighten freely and loosen only
+  with confirmation; they are not tuned against outcomes.
+- **Migrations.** The upgrade test fills a first-release database with projects and tasks; later
+  migrations that change other tables are tested on those tables empty.
+- **Workflows** are shared by every project on the machine and are not parameterised.
+- **Diagnostics.** `doctor` checks the database (it reports damage but cannot repair it: restore a
+  backup), the schema version, the audit chain, host CLIs and host models tables, and gives a fix hint
+  for the database checks only. Plugin and hook installation is checked by `agentos host check`, not
+  by `doctor`.
+- **Backups** are plain copies on this machine: not encrypted and not sent anywhere. Keeping a copy
+  elsewhere is the owner's.
+- **Scores.** Every test the reports cite is checked to exist on every run; whether a grade is right is
+  the independent grader's judgement against `reports/AUDIT_CRITERIA.md`.
+- **Refusal remedies** are a fixed line per reason (printed under the refusal and listed in
+  `docs/REASONS.md`), not advice tailored to the situation.
+- **Licences** of the locked dependencies are read from the installed package metadata and checked
+  against an allowlist; that is not a legal review.
 
 ## Hosts
 

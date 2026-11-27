@@ -102,6 +102,9 @@ def add(conn: sqlite3.Connection, project_id: str | None, layer: Layer, content:
             raise PolicyDenied(f"layer {layer.value} cannot be shared across projects", reasons=["org_layer"])
     if project_id is None:
         raise UsageError("a project is required (it is recorded as the source of the knowledge)")
+    if not (source or "").strip() or not (author or "").strip():
+        raise PolicyDenied("a memory record needs its source and its author (provenance)",
+                           reasons=["no_provenance"])
     require_active(conn, project_id)
     content, _ = redact(content)
     digest = sha256_text(f"{scope}|{project_id}|{layer.value}|{content}")
@@ -154,6 +157,8 @@ def _owned(conn, record_id: str, project_id: str | None) -> MemoryRecord:
 def correct(conn: sqlite3.Connection, record_id: str, new_content: str, author: str,
             project_id: str | None = None) -> MemoryRecord:
     rec = _owned(conn, record_id, project_id)
+    if not (author or "").strip():
+        raise PolicyDenied("a correction needs its author (provenance)", reasons=["no_provenance"])
     if len(new_content) > MAX_CONTENT:
         raise UsageError(f"memory content is limited to {MAX_CONTENT} characters")
     content, _ = redact(new_content)

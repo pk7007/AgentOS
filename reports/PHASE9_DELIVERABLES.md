@@ -6,7 +6,7 @@ the evidence.
 | Deliverable | Where |
 | --- | --- |
 | Original specification compliance matrix | [AUDIT.md](AUDIT.md): every criterion of the 41 domains (A to AO) with a status and the test that proves it, plus one table per V4.0 phase (1 to 8) mapping each requirement of the brief to evidence |
-| Before-and-after audit | [PHASE9_SCORES.md](PHASE9_SCORES.md): baseline, re-grade 1 and re-grade 2 for all 213 criteria, by independent graders; the baseline alone is [PHASE9_BASELINE.md](PHASE9_BASELINE.md), the rubric [AUDIT_CRITERIA.md](AUDIT_CRITERIA.md) |
+| Before-and-after audit | [PHASE9_SCORES.md](PHASE9_SCORES.md): baseline and four re-grades for all 213 criteria, by independent graders; the baseline alone is [PHASE9_BASELINE.md](PHASE9_BASELINE.md), the rubric [AUDIT_CRITERIA.md](AUDIT_CRITERIA.md) |
 | Actual implementation changes | the git history of `main`; per phase, the "V4.0 Phase N" tables in [AUDIT.md](AUDIT.md) name the modules and tests added |
 | Verified agent runtime evidence | [AUDIT.md](AUDIT.md), "V4.0 Phase 2: runtime hooks" (the live spawn-gate run on the second host) and "V4.0 Phase 6: Host integration"; [COMPATIBILITY.md](COMPATIBILITY.md) |
 | Codex compatibility report | [COMPATIBILITY.md](COMPATIBILITY.md), first table. Live Codex sessions are **BLOCKED** (no quota) |
@@ -21,9 +21,10 @@ the evidence.
 
 ## Summary of the result
 
-- 39 of 213 criteria are at 9 or above after two independent re-grades. The goal of 9 on every criterion
-  was not reached; [PHASE9_SCORES.md](PHASE9_SCORES.md) gives the reason for every row below 9.
+- 56 of 213 criteria are at 9 or above after four independent re-grades (39 at the baseline). The goal of
+  9 on every criterion was not reached; [PHASE9_SCORES.md](PHASE9_SCORES.md) gives the reason for every row
+  below 9.
 - 30 criteria are blocked by limits outside the code, chiefly that no live Codex session could be run
   (the account has no quota) and that the hosts expose no stop API or token usage to AgentOS.
-- Defects found by the graders were fixed with tests; the last round of fixes (N1 to N11) has not been
+- Defects found by the graders were fixed with tests; the last round of fixes (G1 to G5) has not been
   re-graded.

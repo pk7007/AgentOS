@@ -16,7 +16,7 @@ SEVERITY = {
     "runtime.unadmitted_subagent": "high", "audit.chain_broken": "high", "eval.flagged": "high",
     "template.quarantined": "high", "governance.stop": "high", "comms.escalated": "high",
     "health.breaker_tripped": "medium", "comms.claim_denied": "low",
-    "runtime.spawn_denied": "medium", "runtime.tool_denied": "medium", "budget.usage_denied": "medium",
+    "runtime.spawn_denied": "medium", "evidence.refused": "medium", "runtime.tool_denied": "medium", "budget.usage_denied": "medium",
     "factory.register_denied": "medium", "agent.transition_denied": "low", "agent.admission_denied": "low",
     "workforce.transfer_denied": "low", "boss.acceptance_denied": "low", "boss.delivery_denied": "low",
 }

@@ -15,6 +15,9 @@ Event flow (hook payload fields as the host runtime sends them on stdin):
   recorded as `runtime.unadmitted_subagent` and told so.
 - SubagentStop: the binding is closed; a cancel or termination requested earlier is confirmed by the
   runtime itself, which frees the concurrency slot.
+- On a tool call, workers of the project that were heard from and then fell silent for an hour are
+  reaped (`health.reap`), at most every five minutes, so a crashed worker is failed and its task retried
+  or escalated without a manual command. A worker never heard from is left alone.
 
 Directories that are not an activated project are left alone.
 """
@@ -22,11 +25,13 @@ Directories that are not an activated project are left alone.
 import json
 import re
 import sqlite3
+import sys
 from dataclasses import dataclass, field
+from datetime import UTC, datetime
 from pathlib import Path
 
 from agentos import audit, governance, lifecycle, projects
-from agentos.db import write_tx
+from agentos.db import get_setting, put_setting, write_tx
 from agentos.errors import NotFound, UsageError
 from agentos.lifecycle import ACTIVE_STATES, AgentState
 from agentos.util import now_iso
@@ -237,19 +242,55 @@ def _subagent_stop(conn, prof: HostProfile, event: dict, actor: str) -> HookResu
     return HookResult(None, [], iid)
 
 
+AUTO_REAP_EVERY_S = 300
+AUTO_REAP_AFTER_MIN = 60
+
+
+def auto_reap(conn: sqlite3.Connection, event: dict, actor: str, now: datetime | None = None) -> dict | None:
+    """Reap silent workers of the event's project, at most once every `AUTO_REAP_EVERY_S` seconds, so a
+    crashed worker is found without anyone running `agentos health reap`.
+
+    Only a worker that has shown a sign of life before (an allowed tool call through this hook, or a
+    heartbeat) and then fell silent for `AUTO_REAP_AFTER_MIN` minutes is failed. A worker the host never
+    reports on cannot be told apart from a busy one, so it is left for `agentos health stale` and a person.
+    Returns what was done, or None when it was not time yet or the directory is not a project."""
+    from agentos import health
+
+    project = _project(conn, event.get("cwd"))
+    if not project:
+        return None
+    now = now or datetime.now(UTC)
+    key = f"health.last_auto_reap.{project.id}"
+    last = get_setting(conn, key)
+    if last and (now - datetime.fromisoformat(last)).total_seconds() < AUTO_REAP_EVERY_S:
+        return None
+    with write_tx(conn):
+        put_setting(conn, key, now.isoformat())
+    return health.reap(conn, project.id, actor, AUTO_REAP_AFTER_MIN, now=now, heard_from_only=True)
+
+
 def handle(conn: sqlite3.Connection, host: str, event: dict, actor: str | None = None) -> HookResult:
     prof = profile(host)
     actor = actor or f"runtime:{prof.name}"
     name = event.get("hook_event_name")
     if name == "PreToolUse":
         if (event.get("tool_name") or "") in prof.spawn_tools:
-            return _gate_spawn(conn, prof, event, actor)
-        return _guard_tool(conn, prof, event, actor)
-    if name == "SubagentStart":
-        return _subagent_start(conn, prof, event, actor)
-    if name == "SubagentStop":
-        return _subagent_stop(conn, prof, event, actor)
-    return HookResult()
+            result = _gate_spawn(conn, prof, event, actor)
+        else:
+            result = _guard_tool(conn, prof, event, actor)
+    elif name == "SubagentStart":
+        result = _subagent_start(conn, prof, event, actor)
+    elif name == "SubagentStop":
+        result = _subagent_stop(conn, prof, event, actor)
+    else:
+        return HookResult()
+    if name != "PreToolUse":
+        return result  # start and stop events are about one worker; the periodic check rides on tool calls
+    try:
+        auto_reap(conn, event, actor)
+    except Exception as exc:  # noqa: BLE001 - housekeeping must never change the hook's answer
+        print(f"agentos hook: stale-worker check skipped: {type(exc).__name__}: {exc}", file=sys.stderr)
+    return result
 
 
 def hooks_config(host: str, guard_tools: bool = False, executable: str = "agentos") -> dict:

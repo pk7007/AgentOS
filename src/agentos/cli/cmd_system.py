@@ -53,15 +53,21 @@ def doctor_checks() -> tuple[list[dict], bool]:
     if not dbp.exists():
         checks.append(_check("database", "UNKNOWN", "not initialized; run: agentos init"))
     else:
-        conn = db.connect()
         try:
-            result = conn.execute("PRAGMA integrity_check").fetchone()[0]
-            integrity_ok = result == "ok"
-            checks.append(_check("database", "VERIFIED" if integrity_ok else "UNSUPPORTED", result))
-            checks.append(_check("schema_version", "VERIFIED", str(db.current_version(conn))))
-            checks.extend(_extra_checks(conn))
-        finally:
-            conn.close()
+            conn = db.connect()
+            try:
+                result = conn.execute("PRAGMA integrity_check").fetchone()[0]
+                integrity_ok = result == "ok"
+                checks.append(_check("database", "VERIFIED" if integrity_ok else "UNSUPPORTED", result))
+                checks.append(_check("schema_version", "VERIFIED", str(db.current_version(conn))))
+                checks.extend(_extra_checks(conn))
+            finally:
+                conn.close()
+        except sqlite3.DatabaseError as exc:
+            integrity_ok = False
+            checks.append(_check("database", "UNSUPPORTED",
+                                 f"cannot be read ({exc}); restore a backup: agentos restore FILE"))
+    checks.extend(_models_checks())
     try:
         probe = sqlite3.connect(":memory:")
         probe.execute("CREATE VIRTUAL TABLE t USING fts5(x)")
@@ -72,6 +78,34 @@ def doctor_checks() -> tuple[list[dict], bool]:
     codex = shutil.which("codex")
     checks.append(_check("codex_cli", "VERIFIED" if codex else "UNSUPPORTED", codex or "not on PATH"))
     return checks, integrity_ok
+
+
+def _models_checks() -> list[dict]:
+    """Each host profile in the AgentOS home that has a [models] table must map known tiers to names."""
+    from agentos.intel import TIERS
+    from agentos.util import load_toml
+
+    out = []
+    for path in sorted((paths.agentos_home() / "hosts").glob("*.toml")):
+        name = f"host_models:{path.stem}"
+        try:
+            models = load_toml(path).get("models")
+        except Exception as exc:  # noqa: BLE001 - a broken profile is reported, not raised
+            out.append(_check(name, "UNSUPPORTED", f"{path.name} does not parse: {exc}"))
+            continue
+        if models is None:
+            continue
+        if not isinstance(models, dict):
+            bad = ["[models] is not a table"]
+        else:
+            bad = [str(k) for k, v in models.items() if k not in TIERS or not isinstance(v, str)]
+        if bad:
+            out.append(_check(name, "UNSUPPORTED", f"{path.name}: unknown tier or non-text value: "
+                              f"{', '.join(bad)} (tiers are {', '.join(TIERS)})"))
+        else:
+            have = [t for t in TIERS if str(models.get(t) or "").strip()]
+            out.append(_check(name, "VERIFIED", "tiers " + (", ".join(have) or "none")))
+    return out
 
 
 def _extra_checks(conn) -> list[dict]:

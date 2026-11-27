@@ -294,11 +294,13 @@ def terminate(conn: sqlite3.Connection, instance_id: str, reason: str, actor: st
         ev_ids, evd = _evals_of(conn, instance_id)
         audit.append_event(conn, "workforce.terminated", actor,
                            {"instance_id": instance_id, "reason": reason, "memory_id": memory_id,
-                            "evaluations": ev_ids}, inst.project_id)
+                            "evaluations": ev_ids, "knowledge_kept": memory_id is not None}, inst.project_id)
     task = tasks.get_task(conn, inst.task_id)
     return {"instance_id": instance_id, "state": after.display_state(), "memory_id": memory_id,
             "evaluations": ev_ids, "evidence": evd, "task_id": task.id, "task_open": task.state in OPEN_TASK,
-            "next": step}
+            "next": step, "knowledge_kept": memory_id is not None,
+            "warnings": [] if memory_id else [("no_handover_note: what this worker learned was not saved; "
+                                               "pass --note next time")]}
 
 
 def transfer(conn: sqlite3.Connection, instance_id: str, host: str, actor: str, to_template: str | None = None,

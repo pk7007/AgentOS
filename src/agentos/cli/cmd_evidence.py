@@ -1,6 +1,7 @@
 """evidence run | show: command results AgentOS observed itself, for grading."""
 
 from agentos import db, evidence
+from agentos.errors import PolicyDenied
 
 
 def register(sub, common) -> None:
@@ -27,7 +28,15 @@ def cmd_run(args, ctx):
     conn = db.require_initialized()
     try:
         p = resolve_project(conn, args.project)
-        return evidence.run(conn, p.id, argv, ctx.actor, timeout_s=args.timeout).model_dump()
+        owner = None
+        if outside := evidence.external_action(argv):
+            from agentos.cli import owner_guard
+
+            try:
+                owner = owner_guard(f"run {outside}, which reaches outside this machine", ctx)
+            except PolicyDenied:
+                owner = None  # evidence.run records the refusal and refuses with `external_action`
+        return evidence.run(conn, p.id, argv, ctx.actor, timeout_s=args.timeout, owner=owner).model_dump()
     finally:
         conn.close()
 

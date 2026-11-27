@@ -101,13 +101,17 @@ def test_retention_removes_only_expired_data_and_needs_the_owner(seeded, project
     seeded.execute("UPDATE claims SET released_at='2000-01-01T00:00:00Z' WHERE path='done.py'")
     comms.claim(seeded, project.id, b, ["working.py"], "t")  # held: never removed
     events = seeded.execute("SELECT count(*) FROM events").fetchone()[0]
-    assert retention.plan(seeded, 90)["would_remove"] == {"messages": 1, "bench_runs": 0, "memory": 1, "claims": 1}
+    # written 200 days ago but deleted today: it counts from its deletion, so it is kept for now
+    assert retention.plan(seeded, 90)["would_remove"] == {"messages": 1, "bench_runs": 0, "memory": 0, "claims": 1}
+    later = datetime.now(UTC) + timedelta(days=100)
+    assert retention.plan(seeded, 90, now=later)["would_remove"]["memory"] == 1
     with pytest.raises(PolicyDenied):
         retention.apply(seeded, 90, "t")
     with pytest.raises(UsageError):
         retention.plan(seeded, 1)
-    assert retention.apply(seeded, 90, "t", owner=owner)["removed"] == {"messages": 1, "bench_runs": 0, "memory": 1, "claims": 1}
-    assert seeded.execute("SELECT count(*) FROM messages").fetchone()[0] == 1
+    assert retention.apply(seeded, 90, "t", owner=owner, now=later)["removed"] == {
+        "messages": 1, "bench_runs": 0, "memory": 1, "claims": 1}
+    assert seeded.execute("SELECT count(*) FROM messages").fetchone()[0] == 1  # the unread one stays
     assert [c["path"] for c in comms.claims(seeded, project.id)] == ["working.py"]
     assert memory.search(seeded, project.id, "forgotten") == [] and memory.inspect(seeded, kept.id)
     assert seeded.execute("SELECT count(*) FROM events").fetchone()[0] == events + 1  # nothing pruned from audit
@@ -198,6 +202,35 @@ def test_the_reason_scan_finds_every_kind_of_refusal():
     assert found["path_claimed"]["message"].startswith("another active worker holds")
     assert all(code == code.lower() and " " not in code for code in found)
     assert len(found) >= 100
+
+
+def test_every_reason_has_a_remedy_and_a_meaning_and_none_is_stale():
+    from agentos.gen import reason_guide, reasons
+
+    found = reasons.scan()
+    assert sorted(set(found) - set(reason_guide.REMEDY)) == [], "add a remedy in gen/reason_guide.py"
+    assert sorted(set(reason_guide.REMEDY) - set(found)) == [], "remove the remedy of a reason that is gone"
+    assert sorted(set(reason_guide.MEANING) - set(found)) == []
+    no_meaning = [c for c, v in found.items() if not v["message"] and c not in reason_guide.MEANING]
+    assert no_meaning == [], "add a meaning in gen/reason_guide.py"
+    assert all(r.strip() for r in reason_guide.REMEDY.values())
+
+
+def test_commands_named_in_remedies_parse():
+    from agentos.cli import build_parser
+    from agentos.gen import reason_guide
+
+    parser = build_parser()
+    for remedy in reason_guide.REMEDY.values():
+        for cmd in re.findall(r"`agentos ([^`]+)`", remedy):
+            parser.parse_args(cmd.split())
+
+
+def test_a_message_built_from_parts_reads_in_order():
+    from agentos.gen import reasons
+
+    msg = reasons.scan()["path_claimed"]["message"]
+    assert msg == "another active worker holds …", msg
 
 
 def test_every_policy_refusal_names_a_reason():

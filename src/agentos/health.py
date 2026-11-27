@@ -69,12 +69,17 @@ def stale(conn: sqlite3.Connection, project_id: str | None = None,
 
 
 def reap(conn: sqlite3.Connection, project_id: str, actor: str, after_minutes: float = DEFAULT_STALE_MINUTES,
-         now: datetime | None = None) -> dict:
-    """Fail every stale worker of the project and recover its task. Returns what was done to each."""
+         now: datetime | None = None, heard_from_only: bool = False) -> dict:
+    """Fail every stale worker of the project and recover its task. Returns what was done to each.
+
+    `heard_from_only` (the automatic check) skips workers that never sent a heartbeat, and records
+    nothing when nothing was reaped, so the audit log does not grow on every check."""
     from agentos import boss
 
     actions = []
     for s in stale(conn, project_id, after_minutes, now):
+        if heard_from_only and not s["heartbeat"]:
+            continue
         to = AgentState.CANCELLED if s["state"] == AgentState.ASSIGNED.value else AgentState.FAILED
         lifecycle.transition(conn, s["instance_id"], to, actor,
                              reason=f"no sign of life since {s['last_seen']}")
@@ -87,6 +92,8 @@ def reap(conn: sqlite3.Connection, project_id: str, actor: str, after_minutes: f
             tasks.set_state(conn, task.id, TaskState.failed, actor, note="worker went silent")
             step["task_action"] = boss.recover(conn, task.id, actor)
         actions.append(step)
+    if heard_from_only and not actions:
+        return {"after_minutes": after_minutes, "reaped": []}
     with write_tx(conn):
         audit.append_event(conn, "health.reaped", actor, {
             "after_minutes": after_minutes, "instances": [a["instance_id"] for a in actions]}, project_id)

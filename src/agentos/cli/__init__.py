@@ -5,14 +5,17 @@ Handlers have the signature `func(args, ctx) -> data | (data, exit_code)`.
 """
 
 import argparse
+import difflib
 import importlib
 import json
 import os
+import sqlite3
 import sys
 from dataclasses import dataclass
 
 from agentos import __version__
 from agentos.errors import AgentOSError, PolicyDenied
+from agentos.gen.reason_guide import REMEDY
 
 COMMAND_MODULES: tuple[str, ...] = ("cmd_system", "cmd_audit", "cmd_project", "cmd_task", "cmd_template", "cmd_agent", "cmd_budget", "cmd_governance", "cmd_perf", "cmd_memory", "cmd_handover", "cmd_gen", "cmd_evidence", "cmd_hook", "cmd_boss", "cmd_factory", "cmd_workforce", "cmd_improve", "cmd_host", "cmd_intel", "cmd_observe", "cmd_coord", "cmd_ops")
 
@@ -98,11 +101,45 @@ def _render(data) -> str:
     return str(data)
 
 
+def _suggest(parser: argparse.ArgumentParser, argv: list[str]) -> None:
+    """After argparse refuses an unknown command, name the closest real ones."""
+    level = parser
+    for word in [a for a in argv if not a.startswith("-")]:
+        subs = [a for a in level._actions if isinstance(a, argparse._SubParsersAction)]
+        if not subs:
+            return
+        choices = subs[0].choices
+        if word not in choices:
+            close = difflib.get_close_matches(word, list(choices), n=3, cutoff=0.6)
+            if close:
+                print("did you mean: " + ", ".join(close) + "?", file=sys.stderr)
+            return
+        level = choices[word]
+
+
+def _database_error(exc: sqlite3.DatabaseError) -> int:
+    """A busy database (exit 2: try again) is told apart from one that cannot be read (exit 5: doctor and
+    restore) and from any other database error (exit 5, reported as it is)."""
+    text = str(exc).lower()
+    if isinstance(exc, sqlite3.OperationalError) and ("locked" in text or "busy" in text):
+        print("error: the AgentOS database is busy (another agentos command is writing); try again in a"
+              " moment", file=sys.stderr)
+        return 2
+    if type(exc) is sqlite3.DatabaseError or "malformed" in text or "not a database" in text:
+        print(f"error: the AgentOS database cannot be read ({exc}); run `agentos doctor`, and restore a"
+              " backup with `agentos restore` if it is damaged", file=sys.stderr)
+        return 5
+    print(f"error: database error: {exc}", file=sys.stderr)
+    return 5
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = build_parser()
     try:
         args = parser.parse_args(argv)
     except SystemExit as exc:
+        if exc.code:
+            _suggest(parser, sys.argv[1:] if argv is None else argv)
         return exc.code if isinstance(exc.code, int) else 2
     if not getattr(args, "func", None):
         parser.print_help(sys.stderr)
@@ -115,12 +152,21 @@ def main(argv: list[str] | None = None) -> int:
             body = {"error": exc.message, "exit_code": exc.exit_code}
             if isinstance(exc, PolicyDenied):
                 body["reasons"] = exc.reasons
+                body["remedies"] = {r: REMEDY[r] for r in exc.reasons if r in REMEDY}
             print(json.dumps(body), file=sys.stderr)
         else:
             print(f"error: {exc.message}", file=sys.stderr)
             if isinstance(exc, PolicyDenied) and exc.reasons:
                 print("reasons: " + ", ".join(exc.reasons), file=sys.stderr)
+                for reason in exc.reasons:
+                    if remedy := REMEDY.get(reason):
+                        print(f"  {reason}: {remedy}", file=sys.stderr)
         return exc.exit_code
+    except sqlite3.DatabaseError as exc:
+        return _database_error(exc)
+    except OSError as exc:
+        print(f"error: {exc.strerror or exc} ({exc.filename or 'file'})", file=sys.stderr)
+        return 2
     code = 0
     if isinstance(result, tuple):
         result, code = result
