@@ -1,6 +1,9 @@
+import agentos
+
+
 def test_version_flag(cli):
     code, out, _ = cli(["--version"])
-    assert code == 0 and "0.1.0" in out
+    assert code == 0 and agentos.__version__ in out
 
 
 def test_unknown_command_exit_2(cli):

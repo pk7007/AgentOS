@@ -31,12 +31,12 @@ jobs:
       - name: Install locked dependencies
         run: |
           python -m pip install --upgrade pip
-          python -m pip install -r requirements-lock.txt
+          python -m pip install --require-hashes -r requirements-lock.txt
           python -m pip install -e . --no-deps
       - name: Lint
         run: python -m ruff check src tests
       - name: Test (live host tests are excluded)
-        run: python -m pytest -q --cov=agentos --cov-branch --cov-report=term
+        run: python -m pytest -q --cov=agentos --cov-branch --cov-report=term --cov-fail-under=90
       - name: Dependencies are consistent
         run: python -m pip check
 
@@ -53,3 +53,38 @@ jobs:
         run: |
           python -m pip install --upgrade pip pip-audit
           python -m pip_audit -r requirements-lock.txt --progress-spinner off --strict
+      - name: A lock with a changed hash is refused
+        run: |
+          sed 's/--hash=sha256:[0-9a-f]\{8\}/--hash=sha256:00000000/' requirements-lock.txt > tampered.txt
+          if python -m pip install --require-hashes --no-deps --dry-run --ignore-installed -r tampered.txt > tamper.log 2>&1; then
+            cat tamper.log; echo "pip accepted files whose hashes do not match the lock"; exit 1
+          fi
+          cat tamper.log
+          # refused for the right reason, not because of a network or resolver error
+          grep -q "DO NOT MATCH THE HASHES" tamper.log
+
+  reproducible-build:
+    name: Reproducible build
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      SOURCE_DATE_EPOCH: "1700000000"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Build the wheel twice and compare
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip wheel . --no-deps -w first
+          rm -rf build src/*.egg-info
+          python -m pip wheel . --no-deps -w second
+          sha256sum first/*.whl second/*.whl
+          test "$(sha256sum < first/*.whl)" = "$(sha256sum < second/*.whl)"
+      - name: The built wheel installs and runs
+        run: |
+          python -m venv /tmp/wheel-env
+          /tmp/wheel-env/bin/pip install --require-hashes -r requirements-lock.txt
+          /tmp/wheel-env/bin/pip install --no-deps first/*.whl
+          /tmp/wheel-env/bin/agentos --version

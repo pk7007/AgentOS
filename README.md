@@ -15,10 +15,12 @@ refuses what isn't allowed.
 
 It runs entirely on your machine: no server, no network calls, no cost.
 
-> **Status: version 0.1.0 (slice 1, the core ledger and CLI).** It works and is tested
-> (303 tests, 94% branch coverage), but a host that never asks AgentOS can still start
-> workers. Blocking that comes in slice 2. See [Limitations](docs/LIMITATIONS.md) and the
-> [audit report](reports/AUDIT.md).
+> **Status: version 0.2.0.** The ledger, the runtime spawn gate, the workforce, self-improvement,
+> organisational intelligence, visibility and worker coordination all work and are tested (see the
+> [audit report](reports/AUDIT.md) for the current test count and coverage). Where the host runs AgentOS's
+> hooks, a worker that was not admitted is refused at spawn; a host without hooks can still start workers.
+> Live Codex sessions have not been run (no quota). See [Limitations](docs/LIMITATIONS.md) and the
+> [Phase 9 scores](reports/PHASE9_SCORES.md) and [host compatibility](reports/COMPATIBILITY.md).
 
 ## Contents
 
@@ -33,7 +35,8 @@ It runs entirely on your machine: no server, no network calls, no cost.
 - [Where your data lives](#where-your-data-lives)
 - [Other hosts](#other-hosts)
 - [Host adapters](#host-adapters)
-- [Troubleshooting](#troubleshooting)
+- [Troubleshooting](#troubleshooting) (more in [docs/TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md))
+- [Recovery runbook](docs/RUNBOOK.md), [worked examples](docs/EXAMPLES.md), [full command reference](docs/CLI.md), [every refusal reason](docs/REASONS.md)
 - [Development](#development)
 - [Project layout](#project-layout)
 
@@ -362,6 +365,59 @@ and progress per objective. Each `observe` view shows one part in full (for exam
 
 Every figure comes from a ledger row or an audit event. The views only read.
 
+### Coordination between workers
+
+Workers that share a repository coordinate through the ledger:
+
+- **Messages**: `agentos msg send --from <worker> --to <worker> <text>` (or `--to owner`, `--to all`);
+  `agentos msg inbox <worker> --mark-read`. Bodies are redacted before they are stored. The host
+  delivers them; AgentOS records them.
+- **Escalations**: `agentos msg escalate --from <worker> <text>` puts a decision in front of the owner.
+  The dashboard and `observe incidents` show it until the owner reads it.
+- **Claims**: `agentos claim take <worker> <path>` before editing. A claim is exclusive: another active
+  worker asking for the same path, a file inside a claimed folder, or a folder containing a claimed file
+  is refused (`path_claimed`) and told who holds it. A claim of a worker that is no longer active is freed
+  automatically, so a crashed worker never blocks the others.
+- **Workflows**: `agentos workflow from-objective <objective> <name>` saves a delivered objective's task
+  graph; `agentos workflow apply <objective> <name>` reuses it. Versions are kept and hashed; a changed
+  stored workflow is refused (`tampered`).
+
+### Worker health
+
+A host reports `agentos health heartbeat <worker>` while a worker runs. `agentos health stale` lists active
+workers not heard from for 15 minutes (configurable), and `agentos health reap` marks them failed, frees
+their slots and retries their tasks with a different template, or escalates at the retry limit.
+
+A circuit breaker suspends a template automatically after three evaluations in a row below 30, so a
+template whose work fails badly stops being admitted at once. The workforce review's milder rule (three
+failing evaluations below 50) still applies when the review runs. `agentos health breaker` shows the
+breaker; `agentos health breaker --window 2 --floor 40` makes it stricter, and making it milder needs the
+owner. Every change is a policy change (`agentos policy history`).
+
+When a task fails its last retry, AgentOS escalates to the owner on its own: the dashboard and
+`agentos observe incidents` show it until the owner reads it with `agentos msg inbox owner --mark-read`.
+
+### Policy versions, retention and benchmarks
+
+- `agentos policy show` prints the policy in force (limits, host and project limits, budgets, tunable
+  values, the emergency stop) with a version number and a hash; `agentos policy history` lists every
+  change with who made it. `agentos policy project-limit max_concurrent 2` tightens one project only.
+- `agentos retention plan` counts read messages, old benchmark runs, released claims and deleted memory older
+  than 90 days;
+  `agentos retention apply` removes them (owner). The audit log is never pruned.
+- `agentos bench run` measures admission, audit appends, memory search and chain verification on a
+  scratch database, also after the ledger has grown; `agentos bench history` flags a run more than 1.5
+  times slower than earlier ones.
+
+### Integrations
+
+- `agentos mcp serve` is a Model Context Protocol server over stdio with read-only tools: status, the
+  dashboard, every `observe` view, memory search, routing advice, the policy and the governance check.
+  Admission, grading and limits stay CLI commands, so the hooks and owner confirmations still gate them.
+- `schemas/` holds JSON Schema files for templates, instances, admission requests and decisions, tasks,
+  evaluations, evidence, memory records, limits and plans, generated from the models the code enforces
+  (`agentos gen schemas`). A test fails if they drift.
+
 ### Emergency stop
 
 `agentos stop` is a big red button anyone can press: no new workers are admitted, and running
@@ -393,8 +449,13 @@ not initialized, `3` refused by policy, `4` not found, `5` integrity failure.
 | Governance | `limits show / set / host`, `budget set / show / use`, `stop [--lift]`, `approval request / grant / deny / consume / check / list`, `owner pin set / clear / status` |
 | Runtime hooks | `hook run HOST` (run by the host runtime, JSON on stdin), `hook bindings [--all]`, `hook config HOST [--guard-tools]` |
 | Plugins | `gen codex [--out] [--force]`, `gen host --profile FILE --out DIR` |
-| Intelligence | `intel staffing [--objective]`, `intel route TASK`, `intel context TASK [--budget N]`, `intel skills`, `intel skill-create EVIDENCE`, `intel org`, `intel failures [--record]`, `intel compete TASK`, `intel governance`, `intel forecast [--objective]`, `intel profile`, `intel lessons`, `intel share MEMORY` |
-| Visibility | `dashboard`, `observe agents / tree / progress / recruitment / terminations / performance / resources / experiments / changes / incidents / controls` |
+| Intelligence | `intel staffing [--objective]`, `intel route TASK [--host H]`, `intel options TASK`, `intel context TASK [--budget N] [--record]`, `intel skills`, `intel skill-create EVIDENCE`, `intel org`, `intel failures [--record]`, `intel compete TASK`, `intel governance`, `intel forecast [--objective]`, `intel profile`, `intel lessons`, `intel share MEMORY`, `intel managers`, `intel calibration`, `intel memory-quality`, `intel reuse` |
+| Visibility | `dashboard`, `observe agents / tree / progress / recruitment / terminations / performance / resources / experiments / changes / incidents / controls / timeline / spans` |
+| Coordination | `msg send --from --to TEXT [--kind] [--task]`, `msg inbox WHO [--all] [--mark-read]`, `msg escalate --from TEXT`, `claim take ID PATH...`, `claim release ID [PATH...]`, `claim list`, `workflow save NAME --file F`, `workflow from-objective OBJ NAME`, `workflow list / show NAME`, `workflow apply OBJ NAME` |
+| Health | `health heartbeat ID`, `health stale [--after-minutes N]`, `health reap [--after-minutes N]`, `health breaker [--window N] [--floor X]` |
+| Policy and data | `policy show`, `policy history`, `policy project-limit FIELD VALUE`, `retention plan / apply [--days N]` |
+| Benchmarks | `bench run [--n N] [--no-record]`, `bench history [--name]` |
+| Integrations | `mcp serve`, `gen schemas`, `gen docs` |
 | Host adapters | `host list`, `host install HOST [--dest DIR] [--profile F]`, `host drift HOST`, `host rollback HOST`, `host uninstall HOST [--force]`, `host bootstrap HOST [--remove]`, `host check HOST`, `host history [HOST]` |
 
 Every command has `--help`. Commands that act on a project take `--project PATH or ID` and
@@ -499,21 +560,26 @@ conversation history. Details and the compatibility reports: [docs/HOSTS.md](doc
 | Codex refuses a spawn: `no admitted worker is waiting` | admit the worker first (`agent admit` with `--host codex`); spawn only if it is admitted |
 | Codex refuses a spawn: `not admitted and waiting` | the instance id in the spawn message was already used, belongs to another project or isn't ASSIGNED; check `agentos agent list` |
 | the AgentOS hooks never run | trust them in Codex `/hooks`; check `agentos --version` works in a new terminal |
+| `path_claimed` (exit 3) | another active worker holds the path; message it or wait (see docs/TROUBLESHOOTING.md) |
+| a template was suspended without a review | the circuit breaker tripped (three evaluations below 30); see `agentos observe incidents` |
 | `doctor` shows `codex_cli: UNSUPPORTED` | the Codex CLI isn't on PATH; AgentOS still works, the plugin just can't be used |
 
 ## Development
 
 ```powershell
 python -m venv .venv
-.venv\Scripts\python -m pip install -e . -r requirements-lock.txt
-.venv\Scripts\python -m pytest -q          # 303 tests; the live host test is excluded
+.venv\Scripts\python -m pip install --require-hashes -r requirements-lock.txt
+.venv\Scripts\python -m pip install -e . --no-deps
+.venv\Scripts\python -m pytest -q          # the live host tests are excluded
 .venv\Scripts\ruff check src tests
 .venv\Scripts\python -m pytest -m live     # runs a real Codex session (uses your Codex quota)
 ```
 
 After changing anything in `definitions/`, regenerate the committed plugin with
-`agentos gen codex --force`. A test fails if `plugins/codex/` is out of date, and another parses
-every `agentos` command shown in the skill and in this README.
+`agentos gen codex --force`; after changing a model or a command, run `agentos gen schemas` and
+`agentos gen docs`. Tests fail if `plugins/codex/`, `schemas/` or `docs/CLI.md` is out of date, and another
+parses every `agentos` command shown in the skill, this README and the guides in `docs/`. After changing a
+pin in `requirements-lock.txt`, run `python scripts/lock_hashes.py` to refresh its hashes.
 
 ## Project layout
 
@@ -524,7 +590,8 @@ src/agentos/          the package: one module per concern
   cli/                one module per command group
   gen/                plugin generators
   migrations/         SQLite schema
-scripts/              install.ps1, uninstall.ps1
+scripts/              install.ps1, uninstall.ps1, lock_hashes.py
+schemas/              generated JSON Schema files
 tests/                unit, integration, security, concurrency and live tests
 docs/                 limitations, host profiles, design spec and plan
 reports/AUDIT.md      criterion-by-criterion audit with evidence

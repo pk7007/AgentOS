@@ -227,3 +227,19 @@ def test_main_thread_calls_without_agent_id_pass_guard_mode(seeded, project, rep
     lifecycle.transition(seeded, iid, lifecycle.AgentState.CANCELLED, "owner")
     assert runtime.handle(seeded, "cc", _spawn(repo, tool="Glob", call="c2")).output is None
     assert _denied(runtime.handle(seeded, "cc", _spawn(repo, tool="Glob", call="c3", agent_id="a1")))
+
+
+def test_an_allowed_tool_call_of_a_bound_subagent_is_a_heartbeat(seeded, project, repo, task):
+    from agentos import health
+
+    iid = _ticket(seeded, project, task)
+    runtime.handle(seeded, "codex", _spawn(repo))
+    runtime.handle(seeded, "codex", _start(repo, "agt_hb"))
+    seeded.execute("UPDATE agent_instances SET last_heartbeat=NULL, updated_at='2000-01-01T00:00:00Z',"
+                   " created_at='2000-01-01T00:00:00Z' WHERE id=?", (iid,))
+    seeded.execute("UPDATE runtime_bindings SET started_at='2000-01-01T00:00:00Z' WHERE instance_id=?", (iid,))
+    assert [s["instance_id"] for s in health.stale(seeded, project.id, 30)] == [iid]
+    before = len(_kinds(seeded))
+    assert runtime.handle(seeded, "codex", _spawn(repo, tool="Bash", agent_id="agt_hb")).output is None
+    assert health.stale(seeded, project.id, 30) == []
+    assert len(_kinds(seeded)) == before  # a heartbeat writes no audit event

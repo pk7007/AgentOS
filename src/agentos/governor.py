@@ -33,13 +33,51 @@ def _local(conn) -> Limits:
     return Limits(**{f: get_setting(conn, f"limits.{f}", getattr(defaults, f)) for f in FIELDS})
 
 
-def get_limits(conn: sqlite3.Connection) -> Limits:
+def get_limits(conn: sqlite3.Connection, project_id: str | None = None) -> Limits:
+    """The effective limits: the local limits, tightened by every host-reported limit and, when a project
+    is given, by that project's own limits. A host or project limit can only ever lower a limit."""
     lim = _local(conn).model_dump()
-    for key, value in conn.execute("SELECT key, value FROM settings WHERE key LIKE 'host.%'"):
+    for key, _value in conn.execute("SELECT key, value FROM settings WHERE key LIKE 'host.%'"):
         parts = key.split(".")
         if len(parts) == 3 and parts[2] in lim:
             lim[parts[2]] = min(lim[parts[2]], type(lim[parts[2]])(get_setting(conn, key)))
+    if project_id:
+        for field, value in project_limits(conn, project_id).items():
+            lim[field] = min(lim[field], type(lim[field])(value))
     return Limits(**lim)
+
+
+def project_limits(conn: sqlite3.Connection, project_id: str) -> dict:
+    prefix = f"project.{project_id}."
+    rows = conn.execute("SELECT key FROM settings WHERE key LIKE ?", (prefix + "%",)).fetchall()
+    return {r[0][len(prefix):]: get_setting(conn, r[0]) for r in rows if r[0][len(prefix):] in FIELDS}
+
+
+def set_project_limit(conn: sqlite3.Connection, project_id: str, field: str, value: float, actor: str,
+                      owner: object | None = None) -> dict:
+    """A limit for one project. Tightening needs nobody; loosening an existing project limit needs the owner.
+    It never raises the effective limit above the global one."""
+    _check_field(field)
+    if conn.execute("SELECT 1 FROM projects WHERE id=?", (project_id,)).fetchone() is None:
+        from agentos.errors import NotFound
+
+        raise NotFound(f"no project {project_id}")
+    kind = type(getattr(Limits(), field))
+    value = kind(value)
+    if value < 0:
+        raise UsageError(f"{field} cannot be negative")
+    current = project_limits(conn, project_id).get(field)
+    from agentos.governance import is_owner
+
+    if current is not None and value > kind(current) and not is_owner(owner):
+        raise PolicyDenied(f"raising the project's {field} from {current} to {value} needs the owner",
+                           reasons=["owner_required"])
+    with write_tx(conn):
+        put_setting(conn, f"project.{project_id}.{field}", value)
+        audit.append_event(conn, "limits.project", actor, {"field": field, "from": current, "to": value,
+                                                           "owner_confirmed": owner is not None}, project_id)
+    return {"project_id": project_id, "limits": project_limits(conn, project_id),
+            "effective": get_limits(conn, project_id).model_dump()}
 
 
 def _check_field(field: str) -> None:

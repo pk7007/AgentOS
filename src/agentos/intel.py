@@ -17,6 +17,7 @@ from agentos.errors import NotFound, PolicyDenied, UsageError
 from agentos.memory import ORG_LAYERS, Layer
 from agentos.paths import agentos_home
 from agentos.templates import TemplateStatus
+from agentos.util import now_iso
 
 OPEN = ("pending", "running", "blocked")
 TIERS = ("small", "medium", "large")
@@ -131,9 +132,11 @@ def _project_perf(conn, project_id: str, template_id: str) -> tuple[int, float |
     return len(vals), statistics.fmean(vals), sum(1 for v in vals if v < 50) / len(vals)
 
 
-def route(conn: sqlite3.Connection, task_id: str, template_id: str | None = None) -> dict:
+def route(conn: sqlite3.Connection, task_id: str, template_id: str | None = None,
+          available: list[str] | None = None) -> dict:
     """The cheapest model tier the task's risk and the worker's record justify. Critical and high-risk work
-    never drops below the large tier; a strong record only lowers low- and medium-risk work."""
+    never drops below the large tier; a strong record only lowers low- and medium-risk work. With the
+    tiers a host has (`available`, see `host_tiers`), it also picks the tier to use and the fallback order."""
     t = tasks.get_task(conn, task_id)
     effort = _effort(conn, t.id)
     tier = {"low": 0, "medium": 1, "high": 2, "critical": 2}[t.risk]
@@ -163,8 +166,39 @@ def route(conn: sqlite3.Connection, task_id: str, template_id: str | None = None
     note = "advice only: the host chooses the model."
     if cap <= 0:
         note += " Paid spend is blocked (cap 0): use the models included with the host."
-    return {"task_id": t.id, "template_id": template_id, "tier": chosen, "reasoning_hint": REASONING[chosen],
-            "relative_cost": RELATIVE_COST[chosen], "reasons": reasons, "paid_spend_allowed": cap > 0, "note": note}
+    out = {"task_id": t.id, "template_id": template_id, "tier": chosen, "reasoning_hint": REASONING[chosen],
+           "relative_cost": RELATIVE_COST[chosen], "reasons": reasons, "paid_spend_allowed": cap > 0, "note": note}
+    return out | _availability(t.risk, chosen, available)
+
+
+def _fallbacks(risk: str, chosen: str) -> list[str]:
+    """Tiers to try when the chosen one is unavailable: stronger tiers first; a weaker tier only for
+    low-risk work, so high and critical work never falls below the large tier."""
+    i = TIERS.index(chosen)
+    return list(TIERS[i + 1:]) + (list(reversed(TIERS[:i])) if risk == "low" else [])
+
+
+def _availability(risk: str, chosen: str, available: list[str] | None) -> dict:
+    fallback = _fallbacks(risk, chosen)
+    if available is None:
+        return {"available_tiers": None, "fallback": fallback, "selected": chosen,
+                "availability": "unknown: no host given, or its profile lists no models"}
+    pick = next((x for x in [chosen, *fallback] if x in available), None)
+    status = ("ok" if pick == chosen else f"{chosen} unavailable: fall back to {pick}" if pick
+              else "no allowed tier is available: wait, or escalate to the owner")
+    return {"available_tiers": available, "fallback": fallback, "selected": pick, "availability": status}
+
+
+def host_tiers(host: str | None) -> list[str] | None:
+    """The tiers a host profile's `models` table maps to a model name, or None when it does not say."""
+    if not host:
+        return None
+    from agentos import adapters
+
+    models = adapters.resolve(host).profile.get("models")
+    if not isinstance(models, dict):
+        return None
+    return [t for t in TIERS if str(models.get(t) or "").strip()]
 
 
 # --- context optimisation ---
@@ -173,9 +207,11 @@ def _tokens(text: str) -> int:
     return max(1, math.ceil(len(text) / CHARS_PER_TOKEN))
 
 
-def context_pack(conn: sqlite3.Connection, task_id: str, budget_tokens: int = 800) -> dict:
+def context_pack(conn: sqlite3.Connection, task_id: str, budget_tokens: int = 800,
+                 record_for: str | None = None) -> dict:
     """The most useful memory for a task within a token budget: validated knowledge and past failures
-    first, duplicates dropped, then by confidence and relevance."""
+    first, duplicates dropped, then by confidence and relevance. With `record_for` (an actor), the included
+    records are counted as used, which `intel reuse` and `intel memory-quality` report."""
     if budget_tokens < 50:
         raise UsageError("the context budget must be at least 50 tokens")
     t = tasks.get_task(conn, task_id)
@@ -195,6 +231,8 @@ def context_pack(conn: sqlite3.Connection, task_id: str, budget_tokens: int = 80
             used += n
             included.append({"id": r.id, "layer": r.layer.value, "scope": r.scope, "validated": r.validated,
                              "tokens_est": n, "content": r.content})
+    if record_for:
+        record_use(conn, [x["id"] for x in included], record_for, t.project_id)
     return {"task_id": t.id, "budget_tokens": budget_tokens, "used_tokens_est": used, "included": included,
             "excluded": excluded,
             "duplicate_tokens_est": sum(x["tokens_est"] for x in excluded if x["reason"] == "duplicate"),
@@ -611,3 +649,192 @@ def share_lesson(conn: sqlite3.Connection, record_id: str, actor: str, min_proje
         audit.append_event(conn, "intel.lesson_shared", actor, {"memory_id": org.id, "records": group["records"],
                                                                "projects": group["projects"]}, rec.project_id)
     return {"memory_id": org.id, "projects": group["projects"], "records": group["records"]}
+
+
+# --- comparing alternatives under uncertainty ---
+
+Z90 = 1.645
+# two-sided 90% Student t critical values by degrees of freedom: with few grades the interval is wide
+T90 = {1: 6.314, 2: 2.920, 3: 2.353, 4: 2.132, 5: 2.015, 6: 1.943, 7: 1.895, 8: 1.860, 9: 1.833, 10: 1.812,
+       12: 1.782, 15: 1.753, 20: 1.725, 30: 1.697, 60: 1.671, 120: 1.658}
+MIN_HALF_WIDTH = 5.0  # identical grades do not prove zero spread: graders usually differ by a few points
+
+
+def t90(df: int) -> float:
+    """The critical value for `df` degrees of freedom, rounded towards the wider interval."""
+    if df < 1:
+        raise ValueError("need at least two grades")
+    keys = [k for k in sorted(T90) if k <= df]
+    return T90[keys[-1]] if df <= 120 else Z90
+
+
+def options(conn: sqlite3.Connection, task_id: str) -> dict:
+    """The candidate templates for a task side by side: expected score with a 90% interval (uncertainty),
+    relative cost (tier cost times effort), expected value per cost unit (cost-benefit) and the risks that
+    apply. A recommendation is made only when both leading options have enough history and the best option's
+    interval does not overlap the runner-up's;
+    otherwise the answer is `insufficient_evidence` and the host or owner decides."""
+    t = tasks.get_task(conn, task_id)
+    effort = _effort(conn, t.id)
+    out = []
+    for c in recruit.rank(conn, t.capabilities, high_risk=t.risk in ("high", "critical")):
+        vals = [r[0] for r in conn.execute("SELECT weighted FROM evaluations WHERE template_id=? AND external_cause=0"
+                                           " AND flags='[]'", (c.template_id,))]
+        n = len(vals)
+        mean = statistics.fmean(vals) if vals else None
+        half = max(MIN_HALF_WIDTH, t90(n - 1) * statistics.stdev(vals) / math.sqrt(n)) if n >= 2 else None
+        tier = route(conn, t.id, c.template_id)["tier"]
+        cost = RELATIVE_COST[tier] * effort
+        tpl = templates.get_template(conn, c.template_id)
+        risks = [x for x, bad in (
+            ("no_history", n == 0), ("thin_history", 0 < n < MIN_HISTORY),
+            ("partial_capability_match", c.match < 1),
+            ("fails_often", bool(vals) and sum(v < 50 for v in vals) / n >= 0.3),
+            ("standard_security_on_risky_task", t.risk in ("high", "critical") and tpl.security_class == "standard"),
+        ) if bad]
+        out.append({"template_id": c.template_id, "evaluations": n,
+                    "expected": None if mean is None else round(mean, 1),
+                    "interval_90": None if half is None else [round(max(0, mean - half), 1), round(min(100, mean + half), 1)],
+                    "tier": tier, "relative_cost": cost,
+                    "value_per_cost": None if mean is None else round(mean / cost, 2), "risks": risks})
+    rated = sorted((o for o in out if o["interval_90"]), key=lambda o: -o["value_per_cost"])
+    if not out:
+        verdict, pick = "no_candidate", None
+    elif (len(rated) >= 2 and min(rated[0]["evaluations"], rated[1]["evaluations"]) >= MIN_HISTORY
+          and rated[0]["interval_90"][0] > rated[1]["interval_90"][1]):
+        verdict, pick = "recommend", rated[0]["template_id"]
+    elif len(rated) == 1 and len(out) == 1 and rated[0]["evaluations"] >= MIN_HISTORY:
+        verdict, pick = "only_option", rated[0]["template_id"]
+    else:
+        verdict, pick = "insufficient_evidence", None
+    return {"task_id": t.id, "risk": t.risk, "effort": effort, "options": out, "verdict": verdict,
+            "recommended": pick,
+            "method": f"mean of unflagged evaluations with a 90% Student t interval (half-width at least "
+                      f"{MIN_HALF_WIDTH:g}); a recommendation needs {MIN_HISTORY} or more evaluations of both "
+                      "leading options and intervals that do not overlap; cost is relative, not money"}
+
+
+# --- managerial effectiveness ---
+
+def managers(conn: sqlite3.Connection, project_id: str) -> dict:
+    """How well each lead's team did: the independent evaluations of the workers it delegated to, their
+    pass rate (weighted 70 or more, unflagged) and how many of their tasks were accepted. A lead is judged by
+    its team's graded results, never by its own say-so."""
+    leads = conn.execute("SELECT DISTINCT p.id, p.template_id FROM agent_instances p JOIN agent_instances c"
+                         " ON c.parent_id=p.id WHERE p.project_id=?", (project_id,)).fetchall()
+    per_lead, per_template = [], defaultdict(list)
+    for lead in leads:
+        team = [r[0] for r in conn.execute("SELECT id FROM agent_instances WHERE parent_id=?", (lead["id"],))]
+        marks = ",".join("?" * len(team))
+        evals = conn.execute(f"SELECT weighted, flags FROM evaluations WHERE instance_id IN ({marks})"
+                             " AND external_cause=0", team).fetchall()
+        accepted = conn.execute(
+            f"SELECT count(DISTINCT a.task_id) FROM task_acceptances a JOIN agent_instances i ON i.task_id=a.task_id"
+            f" WHERE i.id IN ({marks})", team).fetchone()[0]
+        scores = [e["weighted"] for e in evals]
+        passed = sum(1 for e in evals if e["weighted"] >= 70 and e["flags"] == "[]")
+        row = {"lead": lead["id"], "template_id": lead["template_id"], "team": len(team), "evaluations": len(evals),
+               "team_mean": round(statistics.fmean(scores), 1) if scores else None,
+               "pass_rate": round(passed / len(evals), 2) if evals else None, "accepted_tasks": accepted}
+        per_lead.append(row)
+        per_template[lead["template_id"]].extend(scores)
+    templates_out = [{"template_id": k, "team_evaluations": len(v),
+                      "team_mean": round(statistics.fmean(v), 1) if v else None,
+                      "verdict": "unrated" if len(v) < MIN_HISTORY else
+                      ("effective" if statistics.fmean(v) >= 70 else "ineffective")}
+                     for k, v in sorted(per_template.items())]
+    return {"leads": per_lead, "templates": templates_out,
+            "method": f"team evaluations by independent evaluators; a verdict needs {MIN_HISTORY} or more"}
+
+
+# --- evaluator calibration ---
+
+def calibration(conn: sqlite3.Connection, project_id: str, min_shared: int = 2, max_bias: float = 15.0) -> dict:
+    """Compare each evaluator with the consensus on the same work. The consensus for an instance is the
+    median of all its grades, so one outlier does not drag it; bias is an evaluator's mean difference from
+    the consensus. An evaluator whose bias exceeds `max_bias` over at least `min_shared` instances graded by
+    two or more evaluators is flagged. With only two graders the median is their mean, so a large
+    disagreement flags both: a third grader settles which one is off."""
+    rows = conn.execute("SELECT e.instance_id, e.evaluator_id, e.weighted FROM evaluations e JOIN agent_instances a"
+                        " ON a.id=e.instance_id WHERE a.project_id=? AND e.external_cause=0", (project_id,)).fetchall()
+    by_instance = defaultdict(dict)
+    for r in rows:
+        by_instance[r["instance_id"]][r["evaluator_id"]] = r["weighted"]
+    diffs = defaultdict(list)
+    for grades in by_instance.values():
+        if len(grades) < 2:
+            continue
+        consensus = statistics.median(grades.values())
+        for ev, val in grades.items():
+            diffs[ev].append(val - consensus)
+    out = []
+    for ev, d in sorted(diffs.items()):
+        bias = statistics.fmean(d)
+        out.append({"evaluator_id": ev, "shared": len(d), "bias": round(bias, 1),
+                    "mean_abs_diff": round(statistics.fmean(abs(x) for x in d), 1),
+                    "status": "insufficient_overlap" if len(d) < min_shared else
+                    ("out_of_calibration" if abs(bias) > max_bias else "calibrated")})
+    multi = sum(1 for g in by_instance.values() if len(g) >= 2)
+    return {"evaluators": out, "instances_with_several_graders": multi,
+            "flagged": [x["evaluator_id"] for x in out if x["status"] == "out_of_calibration"],
+            "rule": f"|bias| > {max_bias:g} over >= {min_shared} shared instances"}
+
+
+# --- memory quality and reuse ---
+
+STALE_DAYS = 60
+
+
+def _quality(r, now: datetime) -> tuple[int, list[str]]:
+    age = (now - _ts(r["created_at"])).days
+    score = 40 * int(r["validated"]) + round(30 * r["confidence"]) + min(r["uses"], 10) * 2 + (10 if age <= 30 else 0)
+    issues = [x for x, bad in (("unvalidated", not r["validated"]), ("never_used", r["uses"] == 0),
+                               ("low_confidence", r["confidence"] < 0.5), (f"older_than_{STALE_DAYS}d", age > STALE_DAYS))
+              if bad]
+    return min(score, 100), issues
+
+
+def memory_quality(conn: sqlite3.Connection, project_id: str, limit: int = 20) -> dict:
+    """Score every current memory record 0-100: validated (40), confidence (30), reuse (up to 20) and
+    recency (10). The weakest records are listed with what is wrong, as candidates to validate or delete."""
+    now = datetime.now(UTC)
+    rows = conn.execute("SELECT * FROM memory WHERE project_id=? AND deleted=0 AND superseded=0", (project_id,)).fetchall()
+    scored = sorted(({"id": r["id"], "layer": r["layer"], "score": (q := _quality(r, now))[0], "issues": q[1],
+                      "uses": r["uses"]} for r in rows), key=lambda x: (x["score"], x["id"]))
+    scores = [s["score"] for s in scored]
+    return {"records": len(scored), "median_score": statistics.median(scores) if scores else None,
+            "weakest": scored[:limit],
+            "prune_candidates": [s["id"] for s in scored
+                                 if {"unvalidated", "never_used", f"older_than_{STALE_DAYS}d"} <= set(s["issues"])]}
+
+
+def record_use(conn: sqlite3.Connection, record_ids: list[str], actor: str, project_id: str) -> int:
+    """Count that these records were handed to a worker. Only records of the project, or org records."""
+    ids = [r[0] for r in conn.execute(
+        f"SELECT id FROM memory WHERE id IN ({','.join('?' * len(record_ids))}) AND (project_id=? OR scope='org')"
+        " AND deleted=0", [*record_ids, project_id])] if record_ids else []
+    if ids:
+        with write_tx(conn):
+            ts = now_iso()
+            conn.executemany("UPDATE memory SET uses=uses+1, last_used_at=? WHERE id=?", [(ts, i) for i in ids])
+            audit.append_event(conn, "memory.used", actor, {"records": ids}, project_id)
+    return len(ids)
+
+
+def reuse(conn: sqlite3.Connection, project_id: str) -> dict:
+    """How much of what was learned is used again: the share of validated records handed to a worker at least
+    once, the most-used records, and how often lessons shared from other projects were used here."""
+    rows = conn.execute("SELECT id, layer, validated, uses, scope, project_id FROM memory WHERE deleted=0 AND"
+                        " superseded=0 AND (project_id=? OR scope='org')", (project_id,)).fetchall()
+    own = [r for r in rows if r["scope"] != "org"]
+    validated = [r for r in own if r["validated"]]
+    used_events = conn.execute("SELECT count(*) FROM events WHERE kind='memory.used' AND project_id=?",
+                               (project_id,)).fetchone()[0]
+    org = [r for r in rows if r["scope"] == "org"]
+    return {"records": len(own), "validated": len(validated),
+            "validated_reused": sum(1 for r in validated if r["uses"]),
+            "reuse_rate": round(sum(1 for r in validated if r["uses"]) / len(validated), 2) if validated else None,
+            "uses_recorded": used_events,
+            "top": [{"id": r["id"], "layer": r["layer"], "uses": r["uses"]}
+                    for r in sorted(own, key=lambda r: -r["uses"])[:5] if r["uses"]],
+            "cross_project_lessons": len(org), "cross_project_lessons_used": sum(1 for r in org if r["uses"])}

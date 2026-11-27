@@ -158,6 +158,18 @@ A change replaces nothing until it beats the current champion in an experiment:
    lower pass rate, two or more evaluators and nothing flagged; otherwise it rejects and remembers why.
 5. `agentos improve monitor --json` rolls a promoted change back if later grades fall below its baseline.
 
+## Working alongside other workers
+
+- Before editing files, claim them: `agentos claim take <instance> <path>`. On `path_claimed`, do not
+  edit; message the holder (`agentos msg send --from <instance> --to <holder> <text>`) or pick other work.
+  Release claims when done: `agentos claim release <instance>`.
+- Read your inbox at the start of each step: `agentos msg inbox <instance> --mark-read --json`.
+- When a decision is the owner's (conflicting requirements, a risky change), escalate instead of guessing:
+  `agentos msg escalate --from <instance> <text>`.
+- Report liveness while working: `agentos health heartbeat <instance>`.
+- Before choosing a worker, compare: `agentos intel options <task> --json`; when it says
+  `insufficient_evidence`, say so rather than claiming one option is better.
+
 ## Seeing what is happening
 
 - `agentos dashboard --json` before reporting status to the user; `agentos observe incidents --json`

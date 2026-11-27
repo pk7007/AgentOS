@@ -486,11 +486,20 @@ def recover(conn: sqlite3.Connection, task_id: str, actor: str) -> dict:
         "SELECT DISTINCT template_id FROM agent_instances WHERE task_id=? AND state IN (?, ?)",
         (task_id, AgentState.FAILED.value, AgentState.QUARANTINED.value))}
     if task.retries >= task.max_retries:
+        from agentos import comms
+
         with write_tx(conn):
             audit.append_event(conn, "boss.escalated", actor,
                                {"task_id": task_id, "retries": task.retries, "failed_templates": sorted(failed)},
                                task.project_id)
-        return {"action": "escalate_owner", "task_id": task_id, "avoid_templates": sorted(failed),
+            waiting = conn.execute("SELECT id FROM messages WHERE kind='escalation' AND sender=? AND task_id=?"
+                                   " AND read_at IS NULL", (comms.SYSTEM, task_id)).fetchone()
+            # one open escalation per task: asking again does not pile up messages the owner has not read
+            message = waiting[0] if waiting else comms.escalate_from_agentos(
+                conn, task.project_id, f"task {task_id} ({task.title}) failed after {task.retries} retries; "
+                "decide: raise the limit, re-plan the task or cancel it", actor, task_id=task_id)
+        return {"action": "escalate_owner", "task_id": task_id, "message_id": message,
+                "avoid_templates": sorted(failed),
                 "detail": f"retry limit {task.max_retries} reached; the owner decides: raise the limit, "
                           "re-plan the task or cancel it"}
     retried = tasks.set_state(conn, task_id, TaskState.pending, actor, note="boss recovery")

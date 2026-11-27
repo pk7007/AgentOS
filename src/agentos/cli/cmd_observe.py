@@ -1,5 +1,5 @@
 """dashboard; observe agents | tree | progress | recruitment | terminations | performance | resources |
-experiments | changes | incidents | controls.
+experiments | changes | incidents | controls | timeline | spans.
 
 What is happening, from the ledger and the audit log only. Read-only."""
 
@@ -37,6 +37,9 @@ def register(sub, common) -> None:
     view("changes", cmd_changes, "accepted and rejected changes to the organisation")
     view("incidents", cmd_incidents, "security incidents, most severe first", limit=True)
     view("controls", cmd_controls, "emergency stop, owner pin, limits and the commands to act", project=False)
+    view("timeline", cmd_timeline, "activity per day: admissions, refusals, evaluations, incidents, usage").add_argument(
+        "--days", type=int, default=14)
+    view("spans", cmd_spans, "one span per worker, from admission to leaving the active states")
 
 
 def _run(fn):
@@ -115,3 +118,13 @@ def cmd_incidents(conn, args, ctx):
 @_run
 def cmd_controls(conn, args, ctx):
     return observe.controls(conn)
+
+
+@_run
+def cmd_timeline(conn, args, ctx):
+    return observe.timeline(conn, _pid(conn, args), args.days)
+
+
+@_run
+def cmd_spans(conn, args, ctx):
+    return observe.spans(conn, _pid(conn, args))

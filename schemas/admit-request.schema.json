@@ -1,0 +1,42 @@
+{
+  "$id": "agentos/admit-request.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "properties": {
+    "host": {
+      "title": "Host",
+      "type": "string"
+    },
+    "parent_instance_id": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Parent Instance Id"
+    },
+    "project_id": {
+      "title": "Project Id",
+      "type": "string"
+    },
+    "task_id": {
+      "title": "Task Id",
+      "type": "string"
+    },
+    "template_id": {
+      "title": "Template Id",
+      "type": "string"
+    }
+  },
+  "required": [
+    "project_id",
+    "task_id",
+    "template_id",
+    "host"
+  ],
+  "title": "AdmitRequest",
+  "type": "object"
+}

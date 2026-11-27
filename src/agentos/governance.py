@@ -13,7 +13,7 @@ from agentos.db import get_setting, put_setting, write_tx
 from agentos.errors import NotFound, PolicyDenied
 
 STOP_KEY = "governance.emergency_stop"
-PROTECTED_PREFIXES = ("limits.", "governance.", "budget.usd")
+PROTECTED_PREFIXES = ("limits.", "governance.", "budget.usd", "breaker.")
 
 _SENTINEL = object()
 

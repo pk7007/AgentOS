@@ -1,0 +1,43 @@
+{
+  "$id": "agentos/limits.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "properties": {
+    "max_agents_per_task": {
+      "default": 12,
+      "title": "Max Agents Per Task",
+      "type": "integer"
+    },
+    "max_concurrent": {
+      "default": 4,
+      "title": "Max Concurrent",
+      "type": "integer"
+    },
+    "max_depth": {
+      "default": 2,
+      "title": "Max Depth",
+      "type": "integer"
+    },
+    "max_factory_templates": {
+      "default": 5,
+      "title": "Max Factory Templates",
+      "type": "integer"
+    },
+    "max_paid_spend_usd": {
+      "default": 0.0,
+      "title": "Max Paid Spend Usd",
+      "type": "number"
+    },
+    "max_remediation_rounds": {
+      "default": 5,
+      "title": "Max Remediation Rounds",
+      "type": "integer"
+    },
+    "max_retries": {
+      "default": 2,
+      "title": "Max Retries",
+      "type": "integer"
+    }
+  },
+  "title": "Limits",
+  "type": "object"
+}

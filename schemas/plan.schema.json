@@ -1,0 +1,84 @@
+{
+  "$id": "agentos/plan.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "A task graph for `agentos boss plan` and `agentos workflow save`.",
+  "properties": {
+    "tasks": {
+      "items": {
+        "additionalProperties": false,
+        "properties": {
+          "acceptance": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "capabilities": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "department": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "depends_on": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "effort": {
+            "minimum": 1,
+            "type": "integer"
+          },
+          "key": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "objective": {
+            "type": "string"
+          },
+          "parent": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "priority": {
+            "maximum": 100,
+            "minimum": 0,
+            "type": "integer"
+          },
+          "risk": {
+            "enum": [
+              "low",
+              "medium",
+              "high",
+              "critical"
+            ]
+          },
+          "title": {
+            "minLength": 1,
+            "type": "string"
+          }
+        },
+        "required": [
+          "key",
+          "title"
+        ],
+        "type": "object"
+      },
+      "minItems": 1,
+      "type": "array"
+    }
+  },
+  "required": [
+    "tasks"
+  ],
+  "title": "Plan",
+  "type": "object"
+}

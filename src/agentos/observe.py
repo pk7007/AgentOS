@@ -8,13 +8,14 @@ import sqlite3
 from collections import Counter
 from datetime import UTC, datetime
 
-from agentos import audit, governance, governor, lifecycle, performance
+from agentos import audit, comms, governance, governor, lifecycle, performance
 from agentos.db import get_setting
 from agentos.governance import PIN_KEY
 
 SEVERITY = {
     "runtime.unadmitted_subagent": "high", "audit.chain_broken": "high", "eval.flagged": "high",
-    "template.quarantined": "high", "governance.stop": "high",
+    "template.quarantined": "high", "governance.stop": "high", "comms.escalated": "high",
+    "health.breaker_tripped": "medium", "comms.claim_denied": "low",
     "runtime.spawn_denied": "medium", "runtime.tool_denied": "medium", "budget.usage_denied": "medium",
     "factory.register_denied": "medium", "agent.transition_denied": "low", "agent.admission_denied": "low",
     "workforce.transfer_denied": "low", "boss.acceptance_denied": "low", "boss.delivery_denied": "low",
@@ -249,7 +250,8 @@ def dashboard(conn: sqlite3.Connection, project_id: str) -> dict:
             "incidents": inc["counts"], "audit_chain_ok": inc["audit_chain_ok"],
             "changes": {"accepted": len(ch["accepted"]), "rejected": len(ch["rejected"])},
             "experiments": experiments(conn, project_id)["counts"], "slots": f"{res['slots_held']}/"
-            f"{res['max_concurrent']}", "used": res["used"]["project"]}
+            f"{res['max_concurrent']}", "used": res["used"]["project"],
+            "open_escalations": len(comms.open_escalations(conn, project_id))}
 
 
 def render_dashboard(d: dict) -> str:
@@ -267,4 +269,62 @@ def render_dashboard(d: dict) -> str:
         lines.append(f"    {o['title']}: {pct} done, {o['accepted']} accepted, {o['tasks']}")
     if d["blocked_tasks"]:
         lines.append(f"  blocked tasks: {d['blocked_tasks']}")
+    if d.get("open_escalations"):
+        lines.append(f"  ESCALATIONS waiting for the owner: {d['open_escalations']} (agentos msg inbox owner)")
     return "\n".join(lines)
+
+
+# --- time series and spans ---
+
+SERIES = {"admitted": ("agent.admitted",), "refused": ("agent.admission_denied",),
+          "evaluations": ("eval.recorded",), "incidents": tuple(k for k, v in SEVERITY.items() if v == "high"),
+          "usage": ("budget.usage",), "accepted": ("boss.task_accepted",)}
+
+
+def timeline(conn: sqlite3.Connection, project_id: str, days: int = 14) -> dict:
+    """Counts per UTC day for the last `days` days, one series per kind of activity. Days with nothing
+    are present with 0, so the series can be plotted as they are."""
+    if not 1 <= days <= 366:
+        from agentos.errors import UsageError
+
+        raise UsageError("days must be between 1 and 366")
+    today = datetime.now(UTC).date()
+    labels = [(today.fromordinal(today.toordinal() - i)).isoformat() for i in range(days - 1, -1, -1)]
+    series = {}
+    for name, kinds in SERIES.items():
+        counts = Counter()
+        marks = ",".join("?" * len(kinds))
+        for (ts,) in conn.execute(f"SELECT ts FROM events WHERE kind IN ({marks}) AND project_id=? AND ts>=?",
+                                  [*kinds, project_id, labels[0]]):
+            counts[ts[:10]] += 1
+        series[name] = [counts.get(d, 0) for d in labels]
+    return {"project_id": project_id, "days": labels, "series": series, "bucket": "UTC day"}
+
+
+def spans(conn: sqlite3.Connection, project_id: str) -> list[dict]:
+    """One span per worker, from admission to the moment it left the active states (open spans have no
+    end). Spans share a trace id, the id of the root worker of their delegation tree."""
+    active = {s.value for s in lifecycle.ACTIVE_STATES}
+    ends: dict[str, str] = {}
+    for e in _events(conn, ["agent.transition"], project_id, 100000):
+        if e.get("from") in active and e.get("to") not in active:
+            ends.setdefault(e["instance_id"], e["ts"])  # newest first: keep the last exit
+    rows = conn.execute("SELECT id, parent_id, template_id, task_id, state, created_at FROM agent_instances"
+                        " WHERE project_id=? ORDER BY created_at", (project_id,)).fetchall()
+    parent = {r["id"]: r["parent_id"] for r in rows}
+
+    def root(i: str) -> str:
+        seen = set()
+        while parent.get(i) and i not in seen:
+            seen.add(i)
+            i = parent[i]
+        return i
+
+    out = []
+    for r in rows:
+        end = ends.get(r["id"])
+        dur = (datetime.fromisoformat(end) - datetime.fromisoformat(r["created_at"])).total_seconds() if end else None
+        out.append({"span_id": r["id"], "trace_id": root(r["id"]), "parent_span_id": r["parent_id"],
+                    "name": f"{r['template_id']}:{r['task_id']}", "start": r["created_at"], "end": end,
+                    "duration_s": None if dur is None else round(dur, 3), "state": r["state"]})
+    return out

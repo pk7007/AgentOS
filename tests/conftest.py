@@ -1,4 +1,21 @@
+import socket
+
 import pytest
+
+
+@pytest.fixture(autouse=True)
+def no_network(request, monkeypatch):
+    """AgentOS runs entirely on the machine: any in-process attempt to connect anywhere fails the test.
+    Tests marked `live` talk to real host CLIs and are left alone; subprocesses (pip in the installer
+    test) are not affected."""
+    if request.node.get_closest_marker("live"):
+        return
+
+    def refuse(self, *args, **kwargs):
+        raise AssertionError(f"network connection attempted: {args}")
+
+    monkeypatch.setattr(socket.socket, "connect", refuse)
+    monkeypatch.setattr(socket.socket, "connect_ex", refuse)
 
 
 @pytest.fixture

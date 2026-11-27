@@ -15,6 +15,7 @@ from agentos.performance import WEIGHTS
 ROOT = Path(__file__).resolve().parents[2]
 SKILL = ROOT / "definitions" / "skills" / "agentos" / "SKILL.md"
 README = ROOT / "README.md"
+GUIDES = [ROOT / "docs" / n for n in ("RUNBOOK.md", "TROUBLESHOOTING.md", "EXAMPLES.md")]
 
 
 def _commands(doc: Path = SKILL) -> list[str]:
@@ -44,7 +45,11 @@ def test_readme_quickstart_is_checked():
     assert len(_commands(README)) >= 10
 
 
-@pytest.mark.parametrize("cmd", _commands() + _commands(README))
+def test_the_guides_show_commands():
+    assert all(len(_commands(g)) >= 5 for g in GUIDES)
+
+
+@pytest.mark.parametrize("cmd", _commands() + _commands(README) + [c for g in GUIDES for c in _commands(g)])
 def test_skill_command_parses(cmd):
     argv = _concrete(cmd)
     if argv[-1:] == ["x"] and argv[:2] == ["agent", "transition"]:

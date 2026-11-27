@@ -1,0 +1,120 @@
+{
+  "$defs": {
+    "AgentState": {
+      "enum": [
+        "PROPOSED",
+        "RECRUITED",
+        "VALIDATING",
+        "AVAILABLE",
+        "ASSIGNED",
+        "RUNNING",
+        "WAITING",
+        "BLOCKED",
+        "REVIEWING",
+        "COMPLETED",
+        "FAILED",
+        "RETRAINING",
+        "QUARANTINED",
+        "SUSPENDED",
+        "CANCELLED",
+        "TERMINATED",
+        "ARCHIVED"
+      ],
+      "title": "AgentState",
+      "type": "string"
+    }
+  },
+  "$id": "agentos/agent-instance.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "properties": {
+    "created_at": {
+      "title": "Created At",
+      "type": "string"
+    },
+    "depth": {
+      "title": "Depth",
+      "type": "integer"
+    },
+    "host": {
+      "title": "Host",
+      "type": "string"
+    },
+    "id": {
+      "title": "Id",
+      "type": "string"
+    },
+    "last_reason": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "title": "Last Reason"
+    },
+    "parent_id": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "title": "Parent Id"
+    },
+    "project_id": {
+      "title": "Project Id",
+      "type": "string"
+    },
+    "state": {
+      "$ref": "#/$defs/AgentState"
+    },
+    "task_id": {
+      "title": "Task Id",
+      "type": "string"
+    },
+    "template_id": {
+      "title": "Template Id",
+      "type": "string"
+    },
+    "template_version": {
+      "title": "Template Version",
+      "type": "integer"
+    },
+    "termination_confirmed": {
+      "anyOf": [
+        {
+          "type": "boolean"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "title": "Termination Confirmed"
+    },
+    "updated_at": {
+      "title": "Updated At",
+      "type": "string"
+    }
+  },
+  "required": [
+    "id",
+    "template_id",
+    "template_version",
+    "project_id",
+    "task_id",
+    "parent_id",
+    "depth",
+    "host",
+    "state",
+    "termination_confirmed",
+    "created_at",
+    "updated_at",
+    "last_reason"
+  ],
+  "title": "AgentInstance",
+  "type": "object"
+}

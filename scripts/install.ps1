@@ -46,9 +46,12 @@ if ($Apply -and -not (Test-Path (Join-Path $Venv "Scripts\python.exe"))) {
     Check "venv creation"
 }
 
-Step "pip install -e $Repo into the virtual environment"
+Step "pip install the locked, hash-checked dependencies, then -e $Repo without resolving again"
 if ($Apply) {
-    & (Join-Path $Venv "Scripts\python.exe") -m pip install --disable-pip-version-check -q -e $Repo
+    $VenvPy = Join-Path $Venv "Scripts\python.exe"
+    & $VenvPy -m pip install --disable-pip-version-check -q --require-hashes -r (Join-Path $Repo "requirements-lock.txt")
+    Check "pip install of the lock (a hash mismatch stops here)"
+    & $VenvPy -m pip install --disable-pip-version-check -q --no-deps -e $Repo
     Check "pip install"
 }
 

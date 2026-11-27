@@ -1,0 +1,125 @@
+{
+  "$defs": {
+    "TaskState": {
+      "enum": [
+        "pending",
+        "running",
+        "blocked",
+        "done",
+        "failed",
+        "cancelled"
+      ],
+      "title": "TaskState",
+      "type": "string"
+    }
+  },
+  "$id": "agentos/task.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "properties": {
+    "acceptance": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Acceptance",
+      "type": "array"
+    },
+    "capabilities": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Capabilities",
+      "type": "array"
+    },
+    "created_at": {
+      "title": "Created At",
+      "type": "string"
+    },
+    "deps": {
+      "default": [],
+      "items": {
+        "type": "string"
+      },
+      "title": "Deps",
+      "type": "array"
+    },
+    "depth": {
+      "title": "Depth",
+      "type": "integer"
+    },
+    "id": {
+      "title": "Id",
+      "type": "string"
+    },
+    "max_retries": {
+      "title": "Max Retries",
+      "type": "integer"
+    },
+    "objective": {
+      "title": "Objective",
+      "type": "string"
+    },
+    "parent_id": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "title": "Parent Id"
+    },
+    "priority": {
+      "title": "Priority",
+      "type": "integer"
+    },
+    "project_id": {
+      "title": "Project Id",
+      "type": "string"
+    },
+    "retries": {
+      "title": "Retries",
+      "type": "integer"
+    },
+    "risk": {
+      "enum": [
+        "low",
+        "medium",
+        "high",
+        "critical"
+      ],
+      "title": "Risk",
+      "type": "string"
+    },
+    "state": {
+      "$ref": "#/$defs/TaskState"
+    },
+    "title": {
+      "title": "Title",
+      "type": "string"
+    },
+    "updated_at": {
+      "title": "Updated At",
+      "type": "string"
+    }
+  },
+  "required": [
+    "id",
+    "project_id",
+    "parent_id",
+    "title",
+    "objective",
+    "capabilities",
+    "acceptance",
+    "priority",
+    "risk",
+    "state",
+    "retries",
+    "max_retries",
+    "depth",
+    "created_at",
+    "updated_at"
+  ],
+  "title": "Task",
+  "type": "object"
+}

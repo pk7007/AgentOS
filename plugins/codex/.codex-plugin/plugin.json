@@ -1,6 +1,6 @@
 {
   "name": "agentos",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Local ledger and referee for multi-agent coding: admission limits, lifecycle, evaluations, memory, handovers and a tamper-evident audit log.",
   "author": {
     "name": "AgentOS contributors"

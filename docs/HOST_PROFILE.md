@@ -72,3 +72,20 @@ plugin_instructions = false               # skip the instructions file at the pl
 `agentos host install cc` looks for the profile at `~/.agentos/hosts/cc.toml`, then at
 `hosts/cc.local.toml` in a checkout (git-excluded).
 
+## Model tiers (optional)
+
+`agentos intel route TASK --host HOST` can pick a model tier and a fallback order, but only from tiers the
+host says it has. AgentOS does not guess which models an account can use, so without this table the
+answer is `availability: unknown`. List the model name your host uses for each tier you have:
+
+```toml
+[models]
+small  = "the-host-small-model"
+medium = "the-host-medium-model"
+large  = "the-host-large-model"   # leave a tier out, or set it to "", if you do not have it
+```
+
+The tiers are `small`, `medium` and `large`. For Codex, put the table in `~/.agentos/hosts/codex.toml`
+(Codex needs no other key there). When a tier is missing, high-risk work only falls back to a larger
+tier; only low-risk work may fall back to a smaller one.
+

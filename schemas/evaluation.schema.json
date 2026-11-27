@@ -1,0 +1,74 @@
+{
+  "$id": "agentos/evaluation.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "properties": {
+    "category": {
+      "title": "Category",
+      "type": "string"
+    },
+    "created_at": {
+      "title": "Created At",
+      "type": "string"
+    },
+    "evaluator_id": {
+      "title": "Evaluator Id",
+      "type": "string"
+    },
+    "evidence": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Evidence",
+      "type": "array"
+    },
+    "external_cause": {
+      "title": "External Cause",
+      "type": "boolean"
+    },
+    "flags": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Flags",
+      "type": "array"
+    },
+    "id": {
+      "title": "Id",
+      "type": "string"
+    },
+    "instance_id": {
+      "title": "Instance Id",
+      "type": "string"
+    },
+    "scores": {
+      "additionalProperties": {
+        "type": "number"
+      },
+      "title": "Scores",
+      "type": "object"
+    },
+    "template_id": {
+      "title": "Template Id",
+      "type": "string"
+    },
+    "weighted": {
+      "title": "Weighted",
+      "type": "number"
+    }
+  },
+  "required": [
+    "id",
+    "instance_id",
+    "template_id",
+    "evaluator_id",
+    "category",
+    "scores",
+    "weighted",
+    "evidence",
+    "flags",
+    "external_cause",
+    "created_at"
+  ],
+  "title": "Evaluation",
+  "type": "object"
+}

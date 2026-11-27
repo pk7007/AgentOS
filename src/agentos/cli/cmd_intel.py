@@ -1,5 +1,5 @@
 """intel staffing | route | context | skills | skill-create | org | failures | compete | governance | forecast |
-profile | lessons | share.
+profile | lessons | share | options | managers | calibration | memory-quality | reuse.
 
 Advice from the ledger: who to staff, which model tier, what context, which proven commands become
 skills, where the organisation and its failures cluster, which competing solution won, whether the
@@ -25,9 +25,11 @@ def register(sub, common) -> None:
     r = cmd("route", cmd_route, "the cheapest model tier a task's risk and record justify")
     r.add_argument("task")
     r.add_argument("--template", default=None)
+    r.add_argument("--host", default=None, help="check the tiers this host's profile lists and give a fallback")
     c = cmd("context", cmd_context, "the most useful memory for a task within a token budget")
     c.add_argument("task")
     c.add_argument("--budget", type=int, default=800, help="estimated tokens (default 800)")
+    c.add_argument("--record", action="store_true", help="count the included records as used")
     cmd("skills", cmd_skills, "commands proven often enough to become a skill").add_argument(
         "--min-uses", type=int, default=3)
     sc = cmd("skill-create", cmd_skill_create, "write a SKILL.md for a proven command")
@@ -52,6 +54,14 @@ def register(sub, common) -> None:
     sh = cmd("share", cmd_share, "share a lesson across projects once enough projects validated it", project=False)
     sh.add_argument("memory")
     sh.add_argument("--min-projects", type=int, default=2)
+    cmd("options", cmd_options, "candidate templates for a task: expected score, interval, cost, risks").add_argument(
+        "task")
+    cmd("managers", cmd_managers, "how well each lead's team did, from independent evaluations")
+    cal = cmd("calibration", cmd_calibration, "evaluators that grade far from the others on the same work")
+    cal.add_argument("--min-shared", type=int, default=2)
+    cal.add_argument("--max-bias", type=float, default=15.0)
+    cmd("memory-quality", cmd_memory_quality, "score memory records and list the weakest")
+    cmd("reuse", cmd_reuse, "how much learned memory is used again")
 
 
 def _run(fn):
@@ -86,12 +96,12 @@ def cmd_staffing(conn, args, ctx):
 
 @_run
 def cmd_route(conn, args, ctx):
-    return intel.route(conn, _task(conn, args).id, args.template)
+    return intel.route(conn, _task(conn, args).id, args.template, intel.host_tiers(args.host))
 
 
 @_run
 def cmd_context(conn, args, ctx):
-    return intel.context_pack(conn, _task(conn, args).id, args.budget)
+    return intel.context_pack(conn, _task(conn, args).id, args.budget, ctx.actor if args.record else None)
 
 
 @_run
@@ -143,3 +153,28 @@ def cmd_lessons(conn, args, ctx):
 @_run
 def cmd_share(conn, args, ctx):
     return intel.share_lesson(conn, args.memory, ctx.actor, args.min_projects)
+
+
+@_run
+def cmd_managers(conn, args, ctx):
+    return intel.managers(conn, _pid(conn, args))
+
+
+@_run
+def cmd_calibration(conn, args, ctx):
+    return intel.calibration(conn, _pid(conn, args), args.min_shared, args.max_bias)
+
+
+@_run
+def cmd_memory_quality(conn, args, ctx):
+    return intel.memory_quality(conn, _pid(conn, args))
+
+
+@_run
+def cmd_reuse(conn, args, ctx):
+    return intel.reuse(conn, _pid(conn, args))
+
+
+@_run
+def cmd_options(conn, args, ctx):
+    return intel.options(conn, _task(conn, args).id)

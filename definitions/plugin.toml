@@ -1,5 +1,7 @@
 name = "agentos"
-version = "0.1.0"
+version = "0.2.0"
 display_name = "AgentOS"
 description = "Local ledger and referee for multi-agent coding: admission limits, lifecycle, evaluations, memory, handovers and a tamper-evident audit log."
 author = "AgentOS contributors"
+# sha256 of skills/agentos/SKILL.md for this version: change the skill, bump the version, update this
+skill_sha256 = "d50e8b1b39c4fcd7982415b742fc662c9aab93bd2659435d1a450157a6a1ff0e"

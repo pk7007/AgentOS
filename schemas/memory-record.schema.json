@@ -1,0 +1,127 @@
+{
+  "$defs": {
+    "Layer": {
+      "enum": [
+        "working",
+        "episodic",
+        "semantic",
+        "procedural",
+        "performance",
+        "failure",
+        "project",
+        "organizational",
+        "governance"
+      ],
+      "title": "Layer",
+      "type": "string"
+    }
+  },
+  "$id": "agentos/memory-record.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "properties": {
+    "author": {
+      "title": "Author",
+      "type": "string"
+    },
+    "confidence": {
+      "title": "Confidence",
+      "type": "number"
+    },
+    "content": {
+      "title": "Content",
+      "type": "string"
+    },
+    "content_hash": {
+      "title": "Content Hash",
+      "type": "string"
+    },
+    "created_at": {
+      "title": "Created At",
+      "type": "string"
+    },
+    "deleted": {
+      "title": "Deleted",
+      "type": "boolean"
+    },
+    "id": {
+      "title": "Id",
+      "type": "string"
+    },
+    "layer": {
+      "$ref": "#/$defs/Layer"
+    },
+    "project_id": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "title": "Project Id"
+    },
+    "scope": {
+      "enum": [
+        "project",
+        "org"
+      ],
+      "title": "Scope",
+      "type": "string"
+    },
+    "source": {
+      "title": "Source",
+      "type": "string"
+    },
+    "superseded": {
+      "title": "Superseded",
+      "type": "boolean"
+    },
+    "supersedes": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "title": "Supersedes"
+    },
+    "tags": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Tags",
+      "type": "array"
+    },
+    "validated": {
+      "title": "Validated",
+      "type": "boolean"
+    },
+    "version": {
+      "title": "Version",
+      "type": "integer"
+    }
+  },
+  "required": [
+    "id",
+    "project_id",
+    "scope",
+    "layer",
+    "content",
+    "content_hash",
+    "source",
+    "author",
+    "confidence",
+    "validated",
+    "version",
+    "supersedes",
+    "superseded",
+    "deleted",
+    "tags",
+    "created_at"
+  ],
+  "title": "MemoryRecord",
+  "type": "object"
+}

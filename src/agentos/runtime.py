@@ -7,7 +7,9 @@ Event flow (hook payload fields as the host runtime sends them on stdin):
   this project with no runtime binding yet) is waiting. The ticket is claimed atomically. A spawn
   message may name a ticket (`ag_...`); otherwise the oldest is used.
 - PreToolUse for any other tool: if the payload identifies a bound subagent whose instance is no
-  longer active (cancelled, terminated, ...) or the emergency stop is on, the call is denied.
+  longer active (cancelled, terminated, ...) or the emergency stop is on, the call is denied. An allowed
+  call records a heartbeat, so `agentos health stale` sees a working subagent as alive without the
+  model reporting anything (this needs the hook on every tool: `guard_tools`).
 - SubagentStart: the native agent id is bound to the claimed ticket and the instance moves to
   RUNNING. A subagent with no ticket cannot be blocked here (the runtime does not allow it); it is
   recorded as `runtime.unadmitted_subagent` and told so.
@@ -165,6 +167,9 @@ def _guard_tool(conn, prof: HostProfile, event: dict, actor: str) -> HookResult:
         reasons = ["instance_not_active"]
         message = f"AgentOS: this worker ({inst.id}) is {inst.display_state()}; stop and report to the parent agent."
     else:
+        # an allowed tool call is a sign of life: the host's own hook reports it, not the model
+        with write_tx(conn):
+            conn.execute("UPDATE agent_instances SET last_heartbeat=? WHERE id=?", (now_iso(), inst.id))
         return HookResult(None, [], inst.id)
     with write_tx(conn):
         audit.append_event(conn, "runtime.tool_denied", actor,

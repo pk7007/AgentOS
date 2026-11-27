@@ -1,0 +1,90 @@
+{
+  "$id": "agentos/evidence.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "properties": {
+    "actor": {
+      "title": "Actor",
+      "type": "string"
+    },
+    "command": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Command",
+      "type": "array"
+    },
+    "cwd": {
+      "title": "Cwd",
+      "type": "string"
+    },
+    "duration_ms": {
+      "title": "Duration Ms",
+      "type": "integer"
+    },
+    "exit_code": {
+      "title": "Exit Code",
+      "type": "integer"
+    },
+    "finished_at": {
+      "title": "Finished At",
+      "type": "string"
+    },
+    "git_head": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "title": "Git Head"
+    },
+    "id": {
+      "title": "Id",
+      "type": "string"
+    },
+    "output_tail": {
+      "title": "Output Tail",
+      "type": "string"
+    },
+    "project_id": {
+      "title": "Project Id",
+      "type": "string"
+    },
+    "started_at": {
+      "title": "Started At",
+      "type": "string"
+    },
+    "stderr_sha256": {
+      "title": "Stderr Sha256",
+      "type": "string"
+    },
+    "stdout_sha256": {
+      "title": "Stdout Sha256",
+      "type": "string"
+    },
+    "timed_out": {
+      "title": "Timed Out",
+      "type": "boolean"
+    }
+  },
+  "required": [
+    "id",
+    "project_id",
+    "command",
+    "cwd",
+    "exit_code",
+    "timed_out",
+    "stdout_sha256",
+    "stderr_sha256",
+    "output_tail",
+    "git_head",
+    "started_at",
+    "finished_at",
+    "duration_ms",
+    "actor"
+  ],
+  "title": "Evidence",
+  "type": "object"
+}

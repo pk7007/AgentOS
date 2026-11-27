@@ -101,13 +101,21 @@ def standing_reasons(conn: sqlite3.Connection, project_id: str, task_id: str, te
         reasons.extend(risk_reasons)
     if slot_count(conn) >= governor.get_limits(conn).max_concurrent:
         reasons.append("max_concurrent")
+    own = governor.project_limits(conn, project_id).get("max_concurrent")
+    if own is not None and "max_concurrent" not in reasons:
+        from agentos.lifecycle import _SLOT_SQL
+
+        used = conn.execute(f"SELECT count(*) FROM agent_instances WHERE project_id=? AND ({_SLOT_SQL})",
+                            (project_id,)).fetchone()[0]
+        if used >= int(own):
+            reasons.append("project_max_concurrent")
     reasons.extend(governor.exhausted(conn, chain_for(project_id, task_id)))
     return reasons, tpl, approval
 
 
 def admit(conn: sqlite3.Connection, req: AdmitRequest, actor: str) -> AdmitDecision:
     with write_tx(conn):
-        limits = governor.get_limits(conn)
+        limits = governor.get_limits(conn, req.project_id)
         reasons, tpl, approval = standing_reasons(conn, req.project_id, req.task_id, req.template_id)
         depth = 0
         if req.parent_instance_id:

@@ -1,0 +1,135 @@
+{
+  "$defs": {
+    "TemplateStatus": {
+      "enum": [
+        "active",
+        "suspended",
+        "quarantined",
+        "retired",
+        "candidate"
+      ],
+      "title": "TemplateStatus",
+      "type": "string"
+    }
+  },
+  "$id": "agentos/agent-template.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "properties": {
+    "can_delegate": {
+      "default": false,
+      "title": "Can Delegate",
+      "type": "boolean"
+    },
+    "capabilities": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Capabilities",
+      "type": "array"
+    },
+    "department": {
+      "title": "Department",
+      "type": "string"
+    },
+    "description": {
+      "title": "Description",
+      "type": "string"
+    },
+    "id": {
+      "pattern": "^[a-z][a-z0-9-]{1,40}$",
+      "title": "Id",
+      "type": "string"
+    },
+    "instructions": {
+      "title": "Instructions",
+      "type": "string"
+    },
+    "model_hint": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Model Hint"
+    },
+    "name": {
+      "title": "Name",
+      "type": "string"
+    },
+    "read_only": {
+      "default": false,
+      "title": "Read Only",
+      "type": "boolean"
+    },
+    "reasoning_hint": {
+      "anyOf": [
+        {
+          "enum": [
+            "low",
+            "medium",
+            "high"
+          ],
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Reasoning Hint"
+    },
+    "role": {
+      "title": "Role",
+      "type": "string"
+    },
+    "security_class": {
+      "default": "standard",
+      "enum": [
+        "standard",
+        "elevated"
+      ],
+      "title": "Security Class",
+      "type": "string"
+    },
+    "status": {
+      "$ref": "#/$defs/TemplateStatus",
+      "default": "active"
+    },
+    "tools_allow": {
+      "default": [],
+      "items": {
+        "type": "string"
+      },
+      "title": "Tools Allow",
+      "type": "array"
+    },
+    "tools_deny": {
+      "default": [],
+      "items": {
+        "type": "string"
+      },
+      "title": "Tools Deny",
+      "type": "array"
+    },
+    "version": {
+      "default": 1,
+      "title": "Version",
+      "type": "integer"
+    }
+  },
+  "required": [
+    "id",
+    "name",
+    "role",
+    "department",
+    "description",
+    "capabilities",
+    "instructions"
+  ],
+  "title": "AgentTemplate",
+  "type": "object"
+}

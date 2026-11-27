@@ -1,4 +1,4 @@
-# Limitations (version 0.1.0, slice 1)
+# Limitations (version 0.2.0)
 
 What AgentOS does not do yet, or cannot do at all. Read this before relying on it.
 
@@ -126,6 +126,46 @@ answers, not against real outcomes over time. See [INTEL.md](INTEL.md).
 `agentos dashboard` and `agentos observe` print the current state when run; nothing refreshes on
 its own, and there is no web page. Token figures in `observe resources` are estimates.
 
+## Coordination is recorded, not delivered
+
+Messages and claims live in the ledger. AgentOS does not push a message into a running worker, and a
+claim only binds workers that ask for it: a host or worker that edits a file without claiming it is not
+stopped by AgentOS. Heartbeats work only if the host reports them; without them, staleness is judged from
+the last state change.
+
+## A workflow's hash catches accidents, not an attacker
+
+A saved workflow stores its hash next to its body, so `workflow apply` refuses a body that was edited by
+hand or damaged (`tampered`). Someone who can write the database can change both; the audit log's
+`workflow.saved` event, which is hash-chained, is the record to check against.
+
+## Measurements are AgentOS's own
+
+`agentos bench` measures AgentOS's operations on a scratch database, not the host or the model.
+`intel options` uses Student t intervals (at least 5 points either side) and `intel calibration` the median of graders;
+with few evaluations they say `insufficient_evidence` or `insufficient_overlap` instead of guessing.
+Memory reuse is counted only when a context pack is requested with `--record`.
+
+## The MCP server has been tested, not used
+
+`agentos mcp serve` is tested over stdio in a real process, and each tool call opens the ledger with
+SQLite's `query_only`, so it cannot write. It has not yet been connected to a host's own MCP client, and it
+offers tools only (no resources or prompts).
+
+## Retention never touches the audit log
+
+Deleted memory is aged by when it was written, not when it was deleted (the record keeps no deletion
+time), so a record written long ago and deleted today can be removed at the next `retention apply`.
+
+The audit log is a hash chain and is kept in full; removing events would make it unverifiable. Payloads
+are redacted when they are written.
+
+## Hashes cover the locked dependencies, not the build tools
+
+`pip install --require-hashes` checks every locked package. The build backend (setuptools) fetched for
+`pip install -e .` is not hash-checked, and the wheel does not contain `definitions/`, so commands that
+read the bundled definitions (`template seed`, `bench run`) need a checkout.
+
 ## Hosts
 
 - **Codex:** the generated plugin installs and enables in Codex CLI 0.171.0 (checked in a
@@ -153,7 +193,8 @@ its own, and there is no web page. Token figures in `observe resources` are esti
 Built on Windows 11 with Python 3.11. The installer is PowerShell only. The Python package has
 no Windows-only code apart from the console check, which falls back to `isatty()` elsewhere.
 CI (`.github/workflows/ci.yml`) runs lint and the test suite on Windows and Ubuntu with Python
-3.11 and 3.12, and passes there; macOS is untested.
+3.11 and 3.12, a dependency audit and a reproducible-build check; the result of each run is on the
+repository's Actions page and in `reports/AUDIT.md`. macOS is untested.
 
 ## Not in slice 1
 

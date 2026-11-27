@@ -162,6 +162,10 @@ def record_eval(conn: sqlite3.Connection, instance_id: str, evaluator_id: str, c
                                      reason=f"flagged: {', '.join(flags)} (evaluation {eid})")
             if lifecycle.can_transition(inst.state, AgentState.QUARANTINED):
                 lifecycle.transition(conn, instance_id, AgentState.QUARANTINED, actor, reason="flagged evaluation")
+        elif not external_cause:
+            from agentos.health import check_breaker
+
+            check_breaker(conn, inst.template_id, actor)
     return get_eval(conn, eid)
 
 
