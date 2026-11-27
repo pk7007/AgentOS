@@ -158,6 +158,23 @@ A change replaces nothing until it beats the current champion in an experiment:
    lower pass rate, two or more evaluators and nothing flagged; otherwise it rejects and remembers why.
 5. `agentos improve monitor --json` rolls a promoted change back if later grades fall below its baseline.
 
+## Seeing what is happening
+
+- `agentos dashboard --json` before reporting status to the user; `agentos observe incidents --json`
+  when anything was refused; `agentos observe tree --json` to see who reports to whom.
+
+## Advice from the record
+
+- Before staffing up: `agentos intel staffing --json`. Before choosing a model:
+  `agentos intel route <task> --json` (advice; paid spend stays blocked unless the owner allows it).
+- Before starting a worker, give it `agentos intel context <task> --budget 800 --json`.
+- When several workers solved the same task: `agentos intel compete <task> --json`.
+- Now and then: `agentos intel failures --json`, `agentos intel org --json`,
+  `agentos intel forecast --json` and `agentos intel governance --json` (exit 5 means an invariant broke:
+  stop and tell the owner).
+- Proven checks become skills with `agentos intel skill-create <evidence> --json`; lessons several
+  projects validated are shared with `agentos intel share <memory> --json`.
+
 ## Installing and updating the plugin
 
 - `agentos host list --json` shows each host, its CLI version and its install.

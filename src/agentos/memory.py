@@ -117,14 +117,16 @@ def add(conn: sqlite3.Connection, project_id: str | None, layer: Layer, content:
     return inspect(conn, rid)
 
 
-def _fts_query(query: str) -> str:
-    tokens = [t for t in query.split() if any(ch.isalnum() for ch in t)]
-    return " ".join('"' + t.replace('"', '""') + '"' for t in tokens)
+def _fts_query(query: str, any_term: bool = False) -> str:
+    tokens = dict.fromkeys(t for t in query.split() if any(ch.isalnum() for ch in t))
+    return (" OR " if any_term else " ").join('"' + t.replace('"', '""') + '"' for t in tokens)
 
 
 def search(conn: sqlite3.Connection, project_id: str, query: str, layers: list[Layer] | None = None,
-           include_org: bool = True, validated_only: bool = False, limit: int = 10) -> list[MemoryRecord]:
-    fts = _fts_query(query)
+           include_org: bool = True, validated_only: bool = False, limit: int = 10,
+           any_term: bool = False) -> list[MemoryRecord]:
+    """Records matching every word of `query` (or any word, with `any_term`), best match first."""
+    fts = _fts_query(query, any_term)
     if not fts:
         return []
     sql = ("SELECT m.* FROM memory_fts f JOIN memory m ON m.rowid = f.rowid WHERE memory_fts MATCH ? "

@@ -114,6 +114,18 @@ per-agent credentials, so a host that knows another instance's id can grade unde
 Memory search uses SQLite FTS5 keyword matching. There are no embeddings, so different wording
 for the same idea may not match.
 
+## Intelligence is counting, not judgement
+
+The `intel` commands rank and count what the ledger holds. Its thresholds are hand-picked, token
+figures are estimates (4 characters per token), model tiers are relative and the host maps them
+to models, and lessons are matched by normalised text. Each rule is tested against planted known
+answers, not against real outcomes over time. See [INTEL.md](INTEL.md).
+
+## Visibility is a command line, not a live dashboard
+
+`agentos dashboard` and `agentos observe` print the current state when run; nothing refreshes on
+its own, and there is no web page. Token figures in `observe resources` are estimates.
+
 ## Hosts
 
 - **Codex:** the generated plugin installs and enables in Codex CLI 0.171.0 (checked in a

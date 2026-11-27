@@ -330,6 +330,38 @@ kept as validated memory. Only instructions, descriptions, model and reasoning h
 recruitment weights can change this way; permissions, security, approvals, limits and ownership
 cannot. Details: [docs/IMPROVE.md](docs/IMPROVE.md).
 
+### Organisational intelligence
+
+The `intel` commands turn the ledger into advice: how many workers of which kind the open work needs
+(`staffing`), the cheapest model tier a task's risk and the worker's record justify (`route`), the
+most useful memory within a token budget (`context`), checks proven often enough to become a
+reusable skill (`skills`, `skill-create`), idle, overlapping or overloaded parts of the
+organisation (`org`), recurring failures (`failures`), the winner among competing solutions to
+one task (`compete`), an independent re-check of the core invariants (`governance`), what the
+remaining work will cost (`forecast`), this project's history (`profile`) and lessons several
+projects validated, ready to share (`lessons`, `share`). Simple, written-down rules; no model
+calls, no spending. Details: [docs/INTEL.md](docs/INTEL.md).
+
+### Seeing what is happening
+
+`agentos dashboard` prints one screen: the emergency stop, owner pin and pending approvals, the
+audit chain, slots in use, active workers, incidents, accepted and rejected changes, experiments
+and progress per objective. Each `observe` view shows one part in full (for example `agentos observe incidents`):
+
+| View | Shows |
+| --- | --- |
+| `agents [--all-projects]` | workers holding a slot now, with what the host's hooks reported (native agent id, start, stop) |
+| `tree [--all]` | the worker hierarchy, parents and children |
+| `progress` | tasks per objective by state, percent done, accepted tasks, blocked tasks |
+| `recruitment` / `terminations` | admissions, refusals, new templates and transfers; terminations and stops the host has not confirmed |
+| `performance` | each template's record: evaluations, mean, recent mean, band, recommendation |
+| `resources` | slots, agent runs, estimated tokens and paid spend against every budget |
+| `experiments` / `changes` | improvement experiments; accepted and rejected changes (experiments, new templates, rehabilitations, approvals) |
+| `incidents` | security incidents, most severe first: unadmitted subagents, flagged evaluations, quarantines, refused spawns and tools, a broken audit chain |
+| `controls` | the emergency stop, owner pin, limits and the exact commands to stop, cancel, terminate or quarantine |
+
+Every figure comes from a ledger row or an audit event. The views only read.
+
 ### Emergency stop
 
 `agentos stop` is a big red button anyone can press: no new workers are admitted, and running
@@ -361,6 +393,8 @@ not initialized, `3` refused by policy, `4` not found, `5` integrity failure.
 | Governance | `limits show / set / host`, `budget set / show / use`, `stop [--lift]`, `approval request / grant / deny / consume / check / list`, `owner pin set / clear / status` |
 | Runtime hooks | `hook run HOST` (run by the host runtime, JSON on stdin), `hook bindings [--all]`, `hook config HOST [--guard-tools]` |
 | Plugins | `gen codex [--out] [--force]`, `gen host --profile FILE --out DIR` |
+| Intelligence | `intel staffing [--objective]`, `intel route TASK`, `intel context TASK [--budget N]`, `intel skills`, `intel skill-create EVIDENCE`, `intel org`, `intel failures [--record]`, `intel compete TASK`, `intel governance`, `intel forecast [--objective]`, `intel profile`, `intel lessons`, `intel share MEMORY` |
+| Visibility | `dashboard`, `observe agents / tree / progress / recruitment / terminations / performance / resources / experiments / changes / incidents / controls` |
 | Host adapters | `host list`, `host install HOST [--dest DIR] [--profile F]`, `host drift HOST`, `host rollback HOST`, `host uninstall HOST [--force]`, `host bootstrap HOST [--remove]`, `host check HOST`, `host history [HOST]` |
 
 Every command has `--help`. Commands that act on a project take `--project PATH or ID` and

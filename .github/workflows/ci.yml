@@ -37,3 +37,19 @@ jobs:
         run: python -m ruff check src tests
       - name: Test (live host tests are excluded)
         run: python -m pytest -q --cov=agentos --cov-branch --cov-report=term
+      - name: Dependencies are consistent
+        run: python -m pip check
+
+  dependency-audit:
+    name: Dependency security audit
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Audit the locked dependencies for known vulnerabilities
+        run: |
+          python -m pip install --upgrade pip pip-audit
+          python -m pip_audit -r requirements-lock.txt --progress-spinner off --strict

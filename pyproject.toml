@@ -26,7 +26,10 @@ agentos = ["migrations/*.sql"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 addopts = "-m 'not live'"
-markers = ["live: runs a real host session (opt-in)"]
+markers = [
+    "live: talks to a real host CLI installed on this machine (opt-in)",
+    "session: starts a real model session, which uses the account's quota (needs the owner's go-ahead)",
+]
 
 [tool.ruff]
 line-length = 110

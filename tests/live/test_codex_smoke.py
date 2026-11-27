@@ -19,7 +19,7 @@ import pytest
 from tests.conftest import make_repo
 
 ROOT = Path(__file__).resolve().parents[2]
-pytestmark = [pytest.mark.live,
+pytestmark = [pytest.mark.live, pytest.mark.session,
               pytest.mark.skipif(shutil.which("codex") is None, reason="codex CLI not on PATH")]
 
 PROMPT = """Use the agentos skill in .agents/skills/agentos/SKILL.md. Run these with the `agentos` command,

@@ -17,9 +17,9 @@ Criterion register over the source spec's audit domains A to AO, for version 0.1
 which criterion Z forbids. The spec's 9/10 target is therefore **not claimed** for this slice.
 A row is VERIFIED only when a test or recorded command shows it.
 
-Evidence paths are relative to `tests/`. Test run at time of writing (after V4.0 Phase 6,
-host integration): `python -m pytest -q` gives **621 passed** (the live test is excluded by
-default). Branch coverage is 95% overall: adapters 93%, host CLI 100%, improve 98%, policy 100%, improve CLI 96%, recruit 93%, templates 95%, factory 93%, workforce 97%, boss 92%, runtime 93%, hook CLI 100%, admission 96%, audit 97%, evidence 95%, governance 97%, governor 96%, lifecycle 97%, performance 95%, redact 100%. After Phase 5 it was 596 passed, after Phase 4 537, after Phase 3 467, after Phase 2 425, after Phase 1 381. `ruff check src tests` is clean. A fresh clone of the pre-fix commit `1b7d492` gave
+Evidence paths are relative to `tests/`. Test run at time of writing (after V4.0 Phases 7 and 8,
+intelligence and visibility): `python -m pytest -q` gives **675 passed** (the live tests are excluded by
+default). Branch coverage is 96% overall: intel 99%, observe 97%, intel CLI 100%, observe CLI 100%, memory 95%, adapters 93%, host CLI 100%, improve 98%, policy 100%, improve CLI 96%, recruit 93%, templates 95%, factory 93%, workforce 97%, boss 92%, runtime 93%, hook CLI 100%, admission 96%, audit 97%, evidence 95%, governance 97%, governor 96%, lifecycle 97%, performance 95%, redact 100%. After Phase 6 it was 621 passed, after Phase 5 596, after Phase 4 537, after Phase 3 467, after Phase 2 425, after Phase 1 381. `ruff check src tests` is clean. A fresh clone of the pre-fix commit `1b7d492` gave
 303 passed and a clean ruff run, which is the Phase 0 baseline.
 
 ### Host role
@@ -34,7 +34,7 @@ about what AgentOS *records and enforces*, not about decision quality, which sli
 
 | Criterion | Status | Evidence | Notes |
 | --- | --- | --- | --- |
-| Modularity | VERIFIED | one module per concern under `src/agentos/`; each has its own unit test file | 26 core modules, a 4-file generator package, 19 CLI command modules |
+| Modularity | VERIFIED | one module per concern under `src/agentos/`; each has its own unit test file | 28 core modules, a 4-file generator package, 21 CLI command modules |
 | Extensibility | PARTIAL | `cli/__init__.py` `COMMAND_MODULES`; `gen/host.py` profiles (`unit/test_gen.py::test_host_generate_uses_profile`) | adding a command or host needs no core change; no plugin API for third parties |
 | Separation of concerns | VERIFIED | CLI handlers call core functions only; core never imports `cli` | the owner prompt lives in `governance` |
 | Dependency boundaries | VERIFIED | `pyproject.toml`: one runtime dependency (pydantic) | stdlib for SQLite, TOML, argparse |
@@ -119,11 +119,11 @@ about what AgentOS *records and enforces*, not about decision quality, which sli
 
 | Criterion | Status | Evidence | Notes |
 | --- | --- | --- | --- |
-| Decision quality | NOT BUILT | none | host's job; not measurable here |
-| Context understanding | NOT BUILT | none | host's job |
+| Decision quality | PARTIAL | competing solutions ranked on independent evaluations only: `unit/test_intel.py::test_compete_picks_the_independent_winner_and_disqualifies_the_rest` | the host still makes the decisions |
+| Context understanding | PARTIAL | `intel context` packs validated and failure memory first within a budget: `unit/test_intel.py::test_context_pack_puts_validated_and_failures_first_and_respects_the_budget` | understanding is the host's job |
 | Capability matching | VERIFIED | see D: candidate selection | |
 | Evidence synthesis | PARTIAL | evaluations require an `evd_` record AgentOS ran itself: `security/test_phase1_defects.py::test_d06_free_text_evidence_alone_is_rejected`, `unit/test_phase1_features.py::test_evidence_records_what_really_happened` | the host still chooses which command proves what |
-| Organizational effectiveness | UNVERIFIED | benchmark cases now exist (`improve case`), but no real-outcome benchmark has been run | needs real objectives graded over time |
+| Organizational effectiveness | PARTIAL | `intel org` finds idle, overlapping and single-point templates, overloaded capabilities and idle departments: `unit/test_intel.py::test_org_review_finds_idle_overlapping_single_point_overloaded_and_idle_departments`; `intel profile` per project | no real-outcome benchmark over time |
 
 ## J: Job orchestration
 
@@ -153,17 +153,17 @@ about what AgentOS *records and enforces*, not about decision quality, which sli
 | Failure analysis | VERIFIED | `improve retro` diagnoses weak sub-scores, failing evidence and recurring refusals: `unit/test_improve.py::test_retro_diagnoses_weaknesses_and_proposes_a_testable_change`, `::test_recurring_capability_mismatches_suggest_a_recruitment_policy` | thresholds hand-picked |
 | Improvement hypotheses | VERIFIED (rule-based) | same tests; a tried change or a busy target is not proposed again | fixed addenda, not model-written |
 | Experimentation | VERIFIED | champion versus challenger: see "V4.0 Phase 5" | small case counts |
-| Learning retention | PARTIAL | memory persists across sessions and hosts; promotions write validated org memory: `::test_a_better_challenger_is_promoted_into_the_champion` | no measure of reuse |
+| Learning retention | PARTIAL | memory persists across sessions and hosts; promotions write validated org memory: `::test_a_better_challenger_is_promoted_into_the_champion`; recurring failures recorded once (`unit/test_intel.py::test_failure_patterns_find_what_was_planted_and_record_it_once`); proven checks become skills | no measure of reuse |
 
 ## M: Model routing
 
 | Criterion | Status | Evidence | Notes |
 | --- | --- | --- | --- |
-| Capability matching | LATER (slice 4) | none | templates only carry an optional `model_hint` |
-| Cost-quality balance | LATER (slice 4) | none | |
+| Capability matching | VERIFIED (advice) | `intel route` picks a tier from risk, effort and the worker's record: `unit/test_intel.py::test_routing_follows_risk_effort_and_record` | tiers are relative; the host maps them to models |
+| Cost-quality balance | VERIFIED (advice) | a strong record lowers low and medium risk work a tier, never critical; a weak one raises it: `::test_a_strong_record_lowers_medium_risk_but_never_critical`, `::test_a_weak_record_raises_the_tier` | thresholds hand-picked |
 | Availability checks | PARTIAL | `doctor` reports whether the Codex CLI is on PATH (`integration/test_cli_system.py::test_doctor_reports_statuses`) | |
 | Fallback behavior | LATER (slice 4) | none | |
-| Routing evidence | LATER (slice 4) | none | |
+| Routing evidence | VERIFIED | every route lists its reasons and the history it used (this project or all projects) | |
 
 ## N: Native integrations
 
@@ -180,10 +180,10 @@ about what AgentOS *records and enforces*, not about decision quality, which sli
 | Criterion | Status | Evidence | Notes |
 | --- | --- | --- | --- |
 | Logging | VERIFIED | `integration/test_cli_audit.py::test_audit_log_lists_events` | |
-| Metrics | PARTIAL | `status`, `budget show`, `perf show` | no time series |
-| Tracing | PARTIAL | parent/child instance links and depth | no spans |
+| Metrics | PARTIAL | `dashboard`, `observe resources / performance / progress`: `unit/test_observe.py::test_performance_resources_and_controls`, `::test_progress_per_objective` | no time series |
+| Tracing | PARTIAL | parent/child links shown as a tree: `unit/test_observe.py::test_hierarchy_nests_children_under_parents` | no spans |
 | Auditability | VERIFIED | hash chain: `unit/test_audit.py::test_tamper_detected`, `::test_deleted_row_detected`, `integration/test_cli_audit.py::test_audit_verify_exit_5_on_tamper` | |
-| Runtime visibility | PARTIAL | `agent list --active`, `status` | no dashboard (later) |
+| Runtime visibility | VERIFIED | `observe agents` lists every slot holder with what the host's hooks reported: `unit/test_observe.py::test_active_agents_lists_slot_holders_with_what_the_host_reported`; `dashboard`: `integration/test_cli_observe.py::test_views_after_real_work` | command line, not live |
 
 ## P: Performance
 
@@ -213,8 +213,8 @@ about what AgentOS *records and enforces*, not about decision quality, which sli
 | Error handling | VERIFIED | exit codes 2/3/4/5: `unit/test_cli_skeleton.py::test_agentos_error_maps_exit_code`, `integration/test_cli_template_file.py` | bad TOML and missing files no longer show tracebacks |
 | Idempotency | VERIFIED | `integration/test_cli_system.py::test_init_is_idempotent`, `unit/test_db.py::test_migrate_idempotent`, `unit/test_projects.py::test_activate_twice_is_idempotent_and_audited` | |
 | Circuit breakers | PARTIAL | emergency stop, retry limit | no automatic breaker |
-| State consistency | VERIFIED | `unit/test_db.py::test_write_tx_rolls_back`; admission race test (see E) | |
-| Failure recovery | PARTIAL | backup/restore (see AK) | |
+| State consistency | VERIFIED | `unit/test_db.py::test_write_tx_rolls_back`; admission race test (see E); `resilience/test_resilience.py::test_an_error_inside_a_transaction_leaves_no_partial_write`; parallel budget and memory writes: `concurrency/test_parallel_writes.py` | |
+| Failure recovery | VERIFIED | backup/restore (see AK); a process killed mid-write leaves an intact, verifiable database: `resilience/test_resilience.py::test_a_process_killed_mid_write_corrupts_nothing`; a busy database is waited for: `::test_a_busy_database_is_waited_for_not_failed` | |
 
 ## S: Security
 
@@ -241,7 +241,7 @@ about what AgentOS *records and enforces*, not about decision quality, which sli
 | Criterion | Status | Evidence | Notes |
 | --- | --- | --- | --- |
 | Token efficiency | NOT BUILT | none | the host's tokens are not visible to AgentOS |
-| Context management | PARTIAL | handovers carry a compact summary, never transcripts | |
+| Context management | VERIFIED | handovers carry a compact summary, never transcripts; `intel context` fills a token budget, dropping duplicates: `unit/test_intel.py::test_context_pack_puts_validated_and_failures_first_and_respects_the_budget` | token counts are estimates |
 | Resource budgets | VERIFIED | `unit/test_governor.py::test_budget_exceeded_and_release`, `unit/test_admission.py::test_agent_run_budget` | |
 | Duplicate-work prevention | VERIFIED | `unit/test_admission.py::test_duplicate`, `unit/test_memory.py::test_dedupe` | |
 | Cost awareness | VERIFIED | paid spend capped at $0 by default: `unit/test_governor.py::test_paid_spend_blocked`, `::test_usd_budget_above_cap_needs_owner` | AgentOS itself makes no paid calls |
@@ -335,7 +335,7 @@ about what AgentOS *records and enforces*, not about decision quality, which sli
 | Queue performance | NOT BUILT | none | not benchmarked |
 | Concurrency | VERIFIED | see E | |
 | Load management | VERIFIED | `max_concurrent`: `unit/test_admission.py::test_max_concurrent` | |
-| Resource forecasting | LATER (slice 4) | none | |
+| Resource forecasting | VERIFIED | `intel forecast`: `unit/test_intel.py::test_forecast_scales_finished_cost_to_the_remaining_effort_and_warns`, `::test_forecast_needs_history` | linear in effort |
 | Scaling efficiency | NOT BUILT | none | |
 
 ## AE: Maintainability
@@ -405,7 +405,7 @@ about what AgentOS *records and enforces*, not about decision quality, which sli
 | Backups | VERIFIED | see Y | |
 | Restoration | VERIFIED | see Y; restore keeps a safety copy of the replaced DB | |
 | Interrupted tasks | VERIFIED | handovers and orphan warnings (see H, X) | |
-| Recovery testing | VERIFIED | `integration/test_cli_system.py::test_backup_then_restore_roundtrip` | |
+| Recovery testing | VERIFIED | `integration/test_cli_system.py::test_backup_then_restore_roundtrip`; real work restored with the audit chain intact and a safety copy kept: `resilience/test_resilience.py::test_backup_restores_real_work_and_keeps_a_safety_copy` | |
 | Recovery documentation | PARTIAL | README quickstart | no runbook |
 
 ## AL: Developer experience
@@ -432,14 +432,14 @@ are carried in handovers (`unit/test_handover.py::test_create_and_resume_cross_h
 | Project activation | VERIFIED | `unit/test_projects.py` (all), `integration/test_cli_flows.py::test_project_list_and_deactivate` | |
 | Memory isolation | VERIFIED | see S | |
 | Project budgets | VERIFIED | project-scope budgets: `unit/test_governor.py::test_budget_exceeded_and_release`, `unit/test_admission.py::test_agent_run_budget` | |
-| Cross-project coordination | PARTIAL | cross-project dependencies are refused (`unit/test_tasks.py::test_cross_project_dependency_denied`) | no coordination feature |
+| Cross-project coordination | PARTIAL | cross-project dependencies are refused (`unit/test_tasks.py::test_cross_project_dependency_denied`); validated lessons shared once two projects reach them: `unit/test_intel.py::test_a_lesson_is_shared_only_after_two_projects_validate_it` | no shared work between projects |
 | Project-specific governance | PARTIAL | inactive projects are refused (`unit/test_projects.py::test_require_active_denies_inactive`) | limits are global and per host, not per project |
 
 ## AO: Supply-chain and release integrity
 
 | Criterion | Status | Evidence | Notes |
 | --- | --- | --- | --- |
-| Dependency provenance | PARTIAL | PyPI only | no hash checking |
+| Dependency provenance | PARTIAL | PyPI only; CI audits the locked dependencies for known vulnerabilities (`pip-audit --strict`, job `dependency-audit`) and runs `pip check` | no hash checking |
 | Version pinning | PARTIAL | `requirements-lock.txt` | `pip install -e` resolves from `pyproject.toml` ranges |
 | Release reproducibility | NOT BUILT | no release build | |
 | Update safety | PARTIAL | generators never overwrite hand-edited files: `unit/test_gen.py::test_generator_preserves_human_edits` | |
@@ -625,3 +625,55 @@ for both was read the same day (plugin layout, hooks, agents, instructions files
 | Real task Codex to second host | BLOCKED | ledger path VERIFIED (`[codex-cc]`); a live Codex session needs quota this account does not have | run `tests/live` when quota returns |
 | Real task second host to Codex | BLOCKED | ledger path VERIFIED (`[cc-codex]`); same blocker | |
 | No raw conversation history transferred | VERIFIED | handovers hold structured fields only; the test asserts no transcript fields | |
+
+## V4.0 Phase 7: Organisational intelligence
+
+`src/agentos/intel.py`, `agentos intel ...`; rules in [docs/INTEL.md](../docs/INTEL.md). Each
+feature was tested against planted known answers (`unit/test_intel.py`, 22 tests;
+`integration/test_cli_intel.py`, 2 tests), then graded by an independent reviewer (a separate
+code-review agent that did not write the code) on five fixed criteria: (a) a documented,
+deterministic rule; (b) tested against a planted answer including a negative case; (c) no model
+calls, spending or admissions; (d) project isolation; (e) honest output. The first review found a
+real hole in `compete` (an ungraded competitor's grade of a rival counted as independent) and
+ten smaller defects; all were fixed and tested, then re-graded. Scores below are the reviewer's
+second-round scores, before the Phase 9 audit.
+
+| Requirement | Status | Evidence | Review (1st, 2nd) | Open |
+| --- | --- | --- | --- | --- |
+| Predictive staffing | VERIFIED | `::test_staffing_finds_the_waves_the_peak_and_the_gaps`, `::test_staffing_learns_workers_per_task_from_finished_work`, `::test_waves_handle_long_chains_and_cycles` | 7, 8 | counts running tasks at full effort |
+| Cost-aware model routing | VERIFIED (advice) | `::test_routing_follows_risk_effort_and_record`, `::test_a_strong_record_lowers_medium_risk_but_never_critical`, `::test_a_weak_record_raises_the_tier` | 8, 8 | tiers are relative; zero paid spend |
+| Context optimisation | VERIFIED | `::test_context_pack_puts_validated_and_failures_first_and_respects_the_budget` | 6, 7 | relevance is full-text rank; token estimates |
+| Automatic reusable skill creation | VERIFIED | `::test_a_command_proven_in_three_graded_tasks_becomes_a_skill`, `::test_skills_ignore_evidence_from_another_project`, `::test_a_skill_file_that_cannot_be_moved_leaves_no_record` | 6, 8 | |
+| Organisational optimisation | VERIFIED | `::test_org_review_finds_idle_overlapping_single_point_overloaded_and_idle_departments`, `::test_org_review_reports_nothing_structural_for_a_balanced_org` | 6, 7 | idle check is global (templates are global) |
+| Failure pattern detection | VERIFIED | `::test_signature_ignores_paths_numbers_and_quoted_values`, `::test_failure_patterns_find_what_was_planted_and_record_it_once` | 6, 8 | |
+| Competitive solution evaluation | VERIFIED | `::test_compete_picks_the_independent_winner_and_disqualifies_the_rest`, `::test_compete_with_one_or_no_eligible_solution` | 5, 8 | |
+| Independent governance | VERIFIED | `::test_governance_passes_on_a_clean_ledger`, `::test_governance_catches_each_planted_violation` (8 planted violations, all caught) | 7, 8 | |
+| Resource forecasting | VERIFIED | `::test_forecast_needs_history`, `::test_forecast_scales_finished_cost_to_the_remaining_effort_and_warns` | 6, 7 | linear in effort |
+| Project-specific intelligence | VERIFIED | `::test_project_profile_summarises_this_project_only`; routing uses project history first | 7, 7 | |
+| Validated cross-project learning | VERIFIED | `::test_a_lesson_is_shared_only_after_two_projects_validate_it` | 7, 7 | "independent" means different projects (documented) |
+| Simple methods, no new dependencies | VERIFIED | standard library and SQLite only; no change to `requirements-lock.txt` | | |
+
+## V4.0 Phase 8: Visibility and CI
+
+| Requirement | Status | Evidence | Open |
+| --- | --- | --- | --- |
+| Actual active agents | VERIFIED | `observe agents` (slot holders, host-reported runtime data): `unit/test_observe.py::test_active_agents_lists_slot_holders_with_what_the_host_reported` | |
+| Agent hierarchy | VERIFIED | `observe tree`: `::test_hierarchy_nests_children_under_parents`; real admissions: `integration/test_cli_observe.py::test_views_after_real_work` | |
+| Task progress | VERIFIED | `observe progress`: `::test_progress_per_objective` | |
+| Recruitment history | VERIFIED | `observe recruitment`: `::test_recruitment_and_termination_history` | |
+| Termination history | VERIFIED | `observe terminations`, including stops the host has not confirmed: same test | |
+| Performance records | VERIFIED | `observe performance`: `::test_performance_resources_and_controls` | |
+| Resource consumption | VERIFIED | `observe resources`: same test | tokens are estimates |
+| Improvement experiments | VERIFIED | `observe experiments`: `::test_experiments_and_accepted_and_rejected_changes` | |
+| Accepted and rejected changes | VERIFIED | `observe changes`: same test | |
+| Security incidents | VERIFIED | `observe incidents`, sorted by severity, including a broken audit chain: `::test_incidents_are_sorted_by_severity_and_include_a_broken_chain` | |
+| Emergency controls | VERIFIED | `observe controls`, `dashboard`: `::test_dashboard_summarises_and_renders`; the stop itself: `integration/test_cli_observe.py::test_views_after_real_work` | |
+| Reproducible CI | VERIFIED | `.github/workflows/ci.yml`: locked dependencies, Windows and Ubuntu, Python 3.11 and 3.12, `pip check` | no release build |
+| Dependency security checks | VERIFIED | job `dependency-audit`: `pip-audit --strict` on `requirements-lock.txt` (no known vulnerabilities on 2026-11-27) | |
+| Integration tests | VERIFIED | `tests/integration/` (19 files) run on every push | |
+| Resilience tests | VERIFIED | `tests/resilience/test_resilience.py`: rollback, lock wait, killed process | |
+| Concurrency tests | VERIFIED | `tests/concurrency/`: parallel admission, parallel budget charges, parallel identical memory | |
+| Backup restoration tests | VERIFIED | `::test_backup_restores_real_work_and_keeps_a_safety_copy` plus the CLI round trip | |
+| Live compatibility tests | VERIFIED (local) | `tests/live/test_host_compat.py`: Codex 0.171.0 accepted the installed plugin; the second host's validator passed. No model session, no quota. Run with `pytest -m "live and not session" tests/live` | not in CI (the host CLIs are not installed there); the quota-using session test stays BLOCKED |
+| Zero additional paid spend | VERIFIED | GitHub-hosted CI on a public repository and PyPI only; no paid service added | |
+
