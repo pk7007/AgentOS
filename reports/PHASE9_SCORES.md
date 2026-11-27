@@ -41,6 +41,12 @@ The second grader found 11 new defects (N1 to N11 below). They were fixed after 
 Also added after re-grade 2: an autouse test fixture refuses any in-process network connection, and the
 structural checks are shown catching planted violations (`unit/test_architecture.py`).
 
+The graders could not see CI, because the changed workflow had not run yet. CI run 45926054163 on commit
+`6097cb6` then passed all seven jobs: lint and tests (865 tests, 90% coverage gate) on Windows and Ubuntu
+with Python 3.11 and 3.12, the dependency audit with the tampered-lock check, and the reproducible
+build. The rows that were waiting on CI (supply chain, provenance, release reproducibility) have not
+been re-graded with this run.
+
 ## Re-grade 2 (independent)
 
 Scoring notes. Baseline = reports/PHASE9_BASELINE.md; Re-grade 1 = the After column of regrade_p9.md. Each claimed fix was checked in code and tests, and a row moves only on what I verified. CI-only work stays unproven (rule 1). BLOCKED rows score only what was proven. A structural test that passes but has never been shown catching a planted violation is not counted as a refusal case, so such rows stop at 8.
